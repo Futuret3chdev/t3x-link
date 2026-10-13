@@ -7,7 +7,7 @@
   --color-surface: #12141c;
   --color-surface-2: #1b1e29;
   --color-fg: #f4efe6;
-  --color-muted: #9a9284;
+  --color-muted: #e7dccb;
   --color-line: #2c3140;
   --color-primary: #2f7bff;
   --color-primary-fg: #f4efe6;
@@ -20,18 +20,25 @@
 @layer base {
   html {
     color-scheme: dark;
+    font-size: 17px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     margin: 0;
-    min-height: 100vh;
-    background: var(--color-bg);
+    min-height: 100dvh;
+    background:
+      radial-gradient(ellipse 70% 32% at 0% -8%, color-mix(in srgb, var(--color-primary) 42%, transparent), transparent 60%),
+      radial-gradient(ellipse 55% 28% at 100% 0%, color-mix(in srgb, var(--color-accent) 36%, transparent), transparent 55%),
+      var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-sans);
+    font-weight: 500;
     line-height: 1.5;
     text-wrap: pretty;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   h1,
@@ -62,25 +69,29 @@
   }
 
   .card {
-    background: var(--color-surface);
-    border: 1px solid var(--color-line);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 4.25rem),
+      var(--color-surface);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 32%, var(--color-line));
     border-radius: var(--radius-card);
     padding: 1rem;
   }
 
   .kicker {
     font-family: var(--font-brand);
-    font-size: 0.75rem;
-    letter-spacing: 0.16em;
+    font-size: 0.875rem;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-accent);
+    font-weight: 700;
   }
 
   .stat-label {
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
+    font-size: 0.875rem;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--color-muted);
+    color: var(--color-fg);
+    font-weight: 700;
   }
 
   .stat-value {
@@ -168,11 +179,16 @@
     white-space: nowrap;
   }
 
-  .tab[aria-selected="true"],
+  .tab[aria-selected="true"] {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    box-shadow: none;
+  }
+
   .tab[aria-pressed="true"] {
-    background: var(--color-surface-2);
-    color: var(--color-fg);
-    box-shadow: inset 0 0 0 1px var(--color-line);
+    background: var(--color-accent);
+    color: var(--color-accent-fg);
+    box-shadow: none;
   }
 
   .live-dot {
@@ -190,16 +206,74 @@
     box-shadow: none;
   }
 
-  .leaflet-container {
-    background: var(--color-bg);
-    font-family: var(--font-sans);
-    height: 100%;
+  .desk-map {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-surface-2);
     width: 100%;
-    border-radius: var(--radius-card);
+    touch-action: pan-x pan-y;
   }
 
-  .leaflet-container img {
-    max-width: none !important;
+  .desk-map .maplibregl-canvas-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .desk-map .maplibregl-popup-content {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    border-radius: 0.75rem;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.45rem 0.7rem;
+    box-shadow: none;
+  }
+
+  .desk-map .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+    border-top-color: var(--color-surface);
+  }
+
+  .desk-map .maplibregl-popup-anchor-top .maplibregl-popup-tip {
+    border-bottom-color: var(--color-surface);
+  }
+
+  .shell {
+    min-height: 100dvh;
+    overflow-x: clip;
+  }
+
+  .page-pad {
+    padding-bottom: max(4rem, env(safe-area-inset-bottom));
+  }
+
+  .stat-card {
+    border-top: 3px solid var(--color-primary);
+  }
+
+  .stat-card-accent {
+    border-top-color: var(--color-accent);
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+  }
+
+  .legend-dot-accent {
+    background: var(--color-accent);
+  }
+
+  .legend-dot-primary {
+    background: var(--color-primary);
+  }
+
+  .legend-dot-mark {
+    background: var(--color-mark);
   }
 }
 
@@ -209,6 +283,13 @@
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (max-width: 48rem) {
+  .text-sm {
+    font-size: 1rem;
+    line-height: 1.5;
   }
 }
 

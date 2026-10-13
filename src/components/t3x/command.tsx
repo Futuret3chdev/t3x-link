@@ -23,9 +23,9 @@ export function Command() {
   const online = model.link?.online !== false;
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
+    <div className="shell bg-bg text-fg">
       <div className="rule" />
-      <header className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-5 sm:px-6">
+      <header className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
         <img
           src={mark}
           alt="T3x medallion"
@@ -33,25 +33,24 @@ export function Command() {
         />
         <div className="min-w-0 flex-1">
           <p className="kicker">Futuret3ch</p>
-          <h1 className="font-brand text-2xl tracking-wide">
+          <h1 className="font-brand text-xl tracking-wide sm:text-2xl">
             <span className="text-primary">T</span>
             <span className="text-mark">3</span>
             <span className="text-primary">x</span>
             <span> Link</span>
           </h1>
         </div>
-        <p className="flex items-center gap-2 text-sm font-medium">
+        <p className="flex shrink-0 items-center gap-2 text-base font-semibold">
           <span className="live-dot" data-off={online ? "false" : "true"} />
           {model.link ? (model.link.online ? model.link.effectiveLabel : "Offline") : "Checking"}
         </p>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-5 px-4 pb-16 sm:px-6">
-        <p className="max-w-2xl text-muted">
-          Read this connection, find mapped public hotspots, see if the sky is clear enough for
-          Starlink, and bench the path.
+      <main className="page-pad mx-auto grid max-w-6xl gap-5 px-4 sm:px-6">
+        <p className="max-w-2xl text-base text-fg">
+          Read this connection, find mapped public hotspots, watch the Starlink fleet, and bench the path.
         </p>
-        <div role="tablist" aria-label="Desks" className="flex gap-2 overflow-x-auto pb-1">
+        <div role="tablist" aria-label="Desks" className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1">
           {TABS.map((item) => (
             <button
               key={item.id}

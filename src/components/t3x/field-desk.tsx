@@ -88,7 +88,7 @@ export function FieldDesk() {
       <section className="card">
         <p className="kicker">Field notes</p>
         <h2 className="mt-2 text-2xl font-semibold">Networks you want to remember</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-base text-fg">
           Saved on this device only. Passwords are not stored — use the share card if you need to
           hand a guest the current network.
         </p>
@@ -125,18 +125,18 @@ export function FieldDesk() {
           </button>
         </form>
         <ul className="mt-4 grid gap-2">
-          {notes.length === 0 ? <li className="text-sm text-muted">No saved networks yet.</li> : null}
+          {notes.length === 0 ? <li className="text-base text-fg">No saved networks yet.</li> : null}
           {notes.map((note) => (
             <li key={note.id} className="rounded-xl border border-line bg-bg px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{note.name}</p>
-                  <p className="text-sm text-muted">
+                  <p className="text-base text-fg">
                     {KINDS.find((item) => item.id === note.kind)?.label}
                     {note.free ? " · Free" : ""}
                     {note.detail ? ` · ${note.detail}` : ""}
                   </p>
-                  <p className="text-sm text-muted">
+                  <p className="text-base text-fg">
                     <When at={note.at} />
                   </p>
                 </div>
@@ -152,7 +152,7 @@ export function FieldDesk() {
       <div className="grid content-start gap-4">
         <section className="card">
           <p className="kicker">Share a network</p>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-base text-fg">
             Builds a Wi-Fi join code for the screen in front of you. It is not saved.
           </p>
           <form onSubmit={(event) => void makeCard(event)} className="mt-4 grid gap-3">
@@ -201,7 +201,7 @@ export function FieldDesk() {
         <section className="card">
           <p className="kicker">Link journal</p>
           <ul className="mt-3 grid gap-2">
-            {journal.length === 0 ? <li className="text-sm text-muted">Changes to this link will show up here.</li> : null}
+            {journal.length === 0 ? <li className="text-base text-fg">Changes to this link will show up here.</li> : null}
             {journal.map((entry) => (
               <li key={entry.id} className="flex flex-wrap justify-between gap-2 text-sm">
                 <span>{entry.summary}</span>

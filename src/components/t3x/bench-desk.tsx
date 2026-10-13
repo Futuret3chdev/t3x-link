@@ -48,7 +48,7 @@ export function BenchDesk({ model }: { model: LinkModel }) {
       <section className="card">
         <p className="kicker">Bench</p>
         <h2 className="mt-2 text-2xl font-semibold">Measure the path you are on</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted">
+        <p className="mt-2 max-w-2xl text-base text-fg">
           A short test against Cloudflare. About 8 MB down and 1.5 MB up. The browser’s own
           “downlink” number is only a hint — this is the measurement.
         </p>
@@ -63,7 +63,7 @@ export function BenchDesk({ model }: { model: LinkModel }) {
         <article className="card">
           <p className="stat-label">Ping</p>
           <p className="stat-value mt-2">{formatMs(shown?.pingMs ?? null)}</p>
-          <p className="mt-1 text-sm text-muted">Jitter {formatMs(shown?.jitterMs ?? null)}</p>
+          <p className="mt-1 text-base text-fg">Jitter {formatMs(shown?.jitterMs ?? null)}</p>
         </article>
         <article className="card">
           <p className="stat-label">Download</p>
@@ -75,7 +75,7 @@ export function BenchDesk({ model }: { model: LinkModel }) {
         </article>
       </section>
 
-      {note ? <p className="text-sm text-muted">{note}</p> : null}
+      {note ? <p className="text-base text-fg">{note}</p> : null}
 
       {live.length > 1 ? (
         <div className="card">

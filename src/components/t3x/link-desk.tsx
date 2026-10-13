@@ -55,7 +55,7 @@ export function LinkDesk({ model }: { model: LinkModel }) {
       <section className="card accent-rail" aria-live="polite">
         <p className="kicker">This link</p>
         <h2 className="mt-2 text-2xl font-semibold">{verdict}</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted">
+        <p className="mt-2 max-w-2xl text-base text-fg">
           Websites cannot list nearby Wi-Fi names. T3x reads the link this browser will admit, then
           looks up the public address you are actually using.
         </p>
@@ -65,22 +65,22 @@ export function LinkDesk({ model }: { model: LinkModel }) {
         <article className="card">
           <p className="stat-label">Transport</p>
           <p className="stat-value mt-2">{link?.typeLabel ?? "—"}</p>
-          <p className="mt-1 text-sm text-muted">{link?.effectiveLabel ?? "Waiting"}</p>
+          <p className="mt-1 text-base text-fg">{link?.effectiveLabel ?? "Waiting"}</p>
         </article>
         <article className="card">
           <p className="stat-label">Downlink hint</p>
           <p className="stat-value mt-2">{formatMbps(link?.downlink ?? null)}</p>
-          <p className="mt-1 text-sm text-muted">Browser estimate, often capped</p>
+          <p className="mt-1 text-base text-fg">Browser estimate, often capped</p>
         </article>
         <article className="card">
           <p className="stat-label">Round trip hint</p>
           <p className="stat-value mt-2">{formatMs(link?.rtt ?? null)}</p>
-          <p className="mt-1 text-sm text-muted">Not a speed test</p>
+          <p className="mt-1 text-base text-fg">Not a speed test</p>
         </article>
         <article className="card">
           <p className="stat-label">Data saver</p>
           <p className="stat-value mt-2">{link ? (link.saveData ? "On" : "Off") : "—"}</p>
-          <p className="mt-1 text-sm text-muted">{link?.online ? "Path is up" : "Path is down"}</p>
+          <p className="mt-1 text-base text-fg">{link?.online ? "Path is up" : "Path is down"}</p>
         </article>
       </section>
 
@@ -110,7 +110,7 @@ export function LinkDesk({ model }: { model: LinkModel }) {
               <dd className="mt-1 font-medium">{zone || "—"}</dd>
             </div>
           </dl>
-          <p className="mt-3 text-sm text-muted">
+          <p className="mt-3 text-base text-fg">
             Place is approximate, from the public address — not GPS.
             {identity?.starlink ? " Starlink confirmed by the network holder." : ""}
           </p>
@@ -136,7 +136,7 @@ export function LinkDesk({ model }: { model: LinkModel }) {
               <dd className="mt-1 font-medium">{nat ? (nat.relay ? "A relay candidate appeared" : "No relay") : "…"}</dd>
             </div>
           </dl>
-          <p className="mt-3 text-sm text-muted">
+          <p className="mt-3 text-base text-fg">
             {nat?.hiddenLocal
               ? "The browser hid the LAN address behind an mDNS name. That is normal."
               : "Browsers do not scan other devices on the LAN. This only lists candidates this page was allowed to see."}

@@ -403,7 +403,7 @@
     background: var(--color-surface-2);
     width: 100%;
     min-width: 0;
-    touch-action: none;
+    touch-action: pan-y;
   }
 
   .map-tile {

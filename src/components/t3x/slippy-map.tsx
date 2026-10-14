@@ -35,12 +35,14 @@ export function SlippyMap({
   lon,
   lat,
   zoom,
+  tick = 0,
   dots,
   className,
 }: {
   lon: number;
   lat: number;
   zoom: number;
+  tick?: number;
   dots: MapDot[];
   className?: string;
 }) {
@@ -50,11 +52,11 @@ export function SlippyMap({
   const [size, setSize] = useState({ w: 320, h: 288 });
   const [tip, setTip] = useState("");
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesture = useRef({ lon, lat, x: 0, y: 0, pinch: 0 });
+  const gesture = useRef({ lon, lat, x: 0, y: 0, pinch: 0, mode: "undecided" as "undecided" | "pan" | "scroll" });
 
   useEffect(() => {
     setView({ lon, lat, zoom });
-  }, [lat, lon, zoom]);
+  }, [lat, lon, zoom, tick]);
 
   useEffect(() => {
     const node = box.current;
@@ -148,7 +150,6 @@ export function SlippyMap({
 
   function onPointerDown(event: React.PointerEvent) {
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    box.current?.setPointerCapture(event.pointerId);
     const pair = [...pointers.current.values()];
     gesture.current = {
       lon: view.lon,
@@ -156,6 +157,7 @@ export function SlippyMap({
       x: event.clientX,
       y: event.clientY,
       pinch: pair.length >= 2 ? Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y) : 0,
+      mode: "undecided",
     };
   }
 
@@ -175,6 +177,14 @@ export function SlippyMap({
       }
       return;
     }
+    const dx = event.clientX - gesture.current.x;
+    const dy = event.clientY - gesture.current.y;
+    if (gesture.current.mode === "undecided") {
+      if (Math.hypot(dx, dy) < 10) return;
+      gesture.current.mode = Math.abs(dy) > Math.abs(dx) ? "scroll" : "pan";
+      if (gesture.current.mode === "pan") box.current?.setPointerCapture(event.pointerId);
+    }
+    if (gesture.current.mode !== "pan") return;
     const origin = world(gesture.current.lon, gesture.current.lat, view.zoom);
     const moved = unproject(
       origin.x - (event.clientX - gesture.current.x),

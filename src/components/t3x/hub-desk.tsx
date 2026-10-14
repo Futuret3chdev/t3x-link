@@ -167,7 +167,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
           <ul className="mt-3 grid gap-2">
             {journal.slice(0, 6).map((entry) => (
               <li key={entry.id} className="text-base text-fg">
-                {entry.summary}
+                {entry.summary.replaceAll("Hidden", "Online")}
               </li>
             ))}
           </ul>

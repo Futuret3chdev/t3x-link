@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bluetooth, ExternalLink, LocateFixed, MapPin, Navigation, Search, Share2, Wifi } from "lucide-react";
+import { Bluetooth, LocateFixed, MapPin, Search, Share2, Wifi } from "lucide-react";
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
+import { WifiGlobe } from "@/components/t3x/wifi-globe";
 import { formatDistance } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
 import { pickBluetooth } from "@/lib/net/phone";
@@ -42,13 +43,6 @@ function markers(center: Place | null, spots: Hotspot[]): MapDot[] {
 
 export type ScanFix = { lat: number; lon: number; acc: number; id: number };
 
-function directionsUrl(lat: number, lon: number): string {
-  const apple = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  return apple
-    ? `https://maps.apple.com/?daddr=${lat},${lon}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
-}
-
 export function HotspotDesk({
   model,
   active,
@@ -73,6 +67,9 @@ export function HotspotDesk({
   const [status, setStatus] = useState("");
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [shared, setShared] = useState("");
+  const [viewMode, setViewMode] = useState<"map" | "globe">("map");
+  const [look, setLook] = useState<{ lat: number; lon: number; zoom: number } | null>(null);
+  const [pin, setPin] = useState(0);
 
   const visible = useMemo(() => {
     return spots
@@ -88,6 +85,13 @@ export function HotspotDesk({
   const dots = useMemo(() => markers(center, visible), [center, visible]);
   const nearestOpen = visible.find((spot) => spot.free && spot.ssid);
 
+  function showOnMap(spot: Hotspot) {
+    setLook({ lat: spot.lat, lon: spot.lon, zoom: 16 });
+    setPin((value) => value + 1);
+    setViewMode("map");
+    document.getElementById("place-map")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   async function connect(spot: Hotspot) {
     setJoinNote("");
     setError("");
@@ -100,6 +104,8 @@ export function HotspotDesk({
 
   async function scan(lat: number, lon: number, label: string, nextRadius = radius, widen = true) {
     setCenter({ lat, lon, label });
+    setLook(null);
+    setPin((value) => value + 1);
     setBusy("scan");
     setError("");
     setShared("");
@@ -284,7 +290,7 @@ export function HotspotDesk({
           ) : null}
         </div>
         {bleName ? <p className="mt-2 text-base text-fg">Bluetooth device chosen: {bleName}</p> : null}
-        <div className="scroll-row mt-3">
+        <div className="tab-wrap mt-3">
           {CITIES.map((city) => (
             <button
               key={city.name}
@@ -301,7 +307,7 @@ export function HotspotDesk({
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="order-2 grid gap-3 lg:order-1">
-          <div className="scroll-row">
+          <div className="tab-wrap">
             {RADII.map((value) => (
               <button
                 key={value}
@@ -379,24 +385,10 @@ export function HotspotDesk({
                         Connect
                       </button>
                     ) : null}
-                    <a
-                      className="btn btn-ghost"
-                      href={directionsUrl(spot.lat, spot.lon)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Navigation aria-hidden="true" size={16} />
-                      Directions
-                    </a>
-                    <a
-                      className="btn btn-ghost"
-                      href={`https://www.openstreetmap.org/?mlat=${spot.lat}&mlon=${spot.lon}#map=18/${spot.lat}/${spot.lon}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink aria-hidden="true" size={16} />
-                      Map
-                    </a>
+                    <button type="button" className="btn btn-ghost" onClick={() => showOnMap(spot)}>
+                      <MapPin aria-hidden="true" size={16} />
+                      On our map
+                    </button>
                     <button type="button" className="btn btn-accent" onClick={() => remember(spot)}>
                       {savedId === spot.id ? "Saved" : "Save"}
                     </button>
@@ -411,13 +403,45 @@ export function HotspotDesk({
             ))}
           </ul>
         </div>
-        <SlippyMap
-          lon={center?.lon ?? 144.9631}
-          lat={center?.lat ?? -37.8136}
-          zoom={center ? (radius > 2500 ? 12 : 14) : 3}
-          dots={active ? dots : []}
-          className="order-1 h-72 w-full rounded-card border border-line sm:h-80 lg:sticky lg:top-4 lg:order-2 lg:h-[32rem]"
-        />
+        <div id="place-map" className="order-1 grid gap-2 lg:sticky lg:top-4 lg:order-2">
+          <div className="tab-wrap">
+            <button type="button" className="tab" aria-pressed={viewMode === "map"} onClick={() => setViewMode("map")}>
+              Map
+            </button>
+            <button type="button" className="tab" aria-pressed={viewMode === "globe"} onClick={() => setViewMode("globe")}>
+              Globe
+            </button>
+            <button
+              type="button"
+              className="tab"
+              onClick={() => {
+                setFilter("free");
+                setViewMode("globe");
+              }}
+            >
+              Free wifi
+            </button>
+          </div>
+          {viewMode === "globe" ? (
+            <>
+              <WifiGlobe spots={visible.map((spot) => ({ name: spot.name, lat: spot.lat, lon: spot.lon, free: spot.free }))} />
+              <p className="text-base text-fg">
+                {visible.some((spot) => spot.free)
+                  ? "Gold is tagged free in this scan. Drag to turn the globe."
+                  : "No place in this scan is tagged free. Drag to turn the globe."}
+              </p>
+            </>
+          ) : (
+            <SlippyMap
+              lon={look?.lon ?? center?.lon ?? 144.9631}
+              lat={look?.lat ?? center?.lat ?? -37.8136}
+              zoom={look?.zoom ?? (center ? (radius > 2500 ? 12 : 14) : 11)}
+              tick={pin}
+              dots={active ? dots : []}
+              className="h-72 w-full rounded-card border border-line sm:h-80 lg:h-[32rem]"
+            />
+          )}
+        </div>
       </div>
     </div>
   );

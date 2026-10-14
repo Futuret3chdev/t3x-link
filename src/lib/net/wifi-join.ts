@@ -22,3 +22,16 @@ export async function joinOpenWifi(ssid: string): Promise<string> {
   window.location.assign(target);
   return "The open-network profile is downloading. Install it on the phone that should join.";
 }
+
+export function openHotspotSettings(name: string): string {
+  const android = /Android/i.test(navigator.userAgent);
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (android) {
+    window.location.assign("intent:#Intent;action=android.settings.TETHER_SETTINGS;end");
+    return `Hotspot settings should open. Set the name to “${name}” and leave the security open.`;
+  }
+  if (ios) {
+    return `On this iPhone open Settings, tap Personal Hotspot, turn it on, and set the name to “${name}”. A website cannot switch the hotspot on.`;
+  }
+  return `Turn on your hotspot and set the name to “${name}”.`;
+}

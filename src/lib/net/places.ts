@@ -52,6 +52,61 @@ function isUseful(type: string, tags: Record<string, string>): boolean {
   return /library|community|cowork|cafe|internet/.test(type) || Boolean(tags.internet_access);
 }
 
+type OverpassElement = {
+  type?: string;
+  id?: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat?: number; lon?: number };
+  tags?: Record<string, string>;
+};
+
+async function overpass(lat: number, lon: number, radius: number): Promise<Hotspot[]> {
+  const query = `[out:json][timeout:20];(node["amenity"~"^(library|cafe|community_centre|university|college|hostel|hotel|coworking_space)$"](around:${radius},${lat},${lon});way["amenity"~"^(library|cafe|community_centre|university|college|hostel|hotel|coworking_space)$"](around:${radius},${lat},${lon});node["internet_access"](around:${radius},${lat},${lon});way["internet_access"](around:${radius},${lat},${lon}););out center 60;`;
+  const res = await fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: `data=${encodeURIComponent(query)}`,
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!res.ok) throw new Error("The place map is busy. Try a city chip.");
+  const body = (await res.json()) as { elements?: OverpassElement[] };
+  const spots: Hotspot[] = [];
+  const seen = new Set<string>();
+  for (const row of body.elements || []) {
+    const tags = row.tags || {};
+    const pointLat = Number(row.lat ?? row.center?.lat);
+    const pointLon = Number(row.lon ?? row.center?.lon);
+    if (!Number.isFinite(pointLat) || !Number.isFinite(pointLon)) continue;
+    const id = `${row.type || "n"}/${row.id ?? spots.length}`;
+    if (seen.has(id)) continue;
+    const distanceM = haversine(lat, lon, pointLat, pointLon);
+    if (distanceM > radius * 1.15) continue;
+    seen.add(id);
+    const amenity = tags.amenity || "";
+    const kind = kindOf(amenity, tags);
+    const fee = `${tags["internet_access:fee"] || ""} ${tags.fee || ""}`.toLowerCase();
+    const address = [tags["addr:housenumber"], tags["addr:street"], tags["addr:suburb"]].filter(Boolean).join(" ");
+    spots.push({
+      id,
+      name: tags.name || kind.kindLabel,
+      lat: pointLat,
+      lon: pointLon,
+      kind: kind.kind,
+      kindLabel: kind.kindLabel,
+      free: fee.includes("no") || fee.includes("none") || fee.includes("free"),
+      access: tags.internet_access || "",
+      hours: tags.opening_hours || "",
+      address,
+      website: httpUrl(tags.website || tags["contact:website"]),
+      distanceM,
+      ssid: cleanSsid(tags["internet_access:ssid"] || tags.ssid || "") || "",
+    });
+  }
+  spots.sort((a, b) => a.distanceM - b.distanceM);
+  return spots;
+}
+
 async function nominatim(params: Record<string, string>): Promise<NominatimRow[]> {
   const url = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(params)}`;
   const res = await fetch(url, {
@@ -79,10 +134,17 @@ export const searchHotspots = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<Hotspot[]> => {
     const { lat, lon, radius, q } = data;
+    if (!q || q.startsWith("[")) {
+      try {
+        return await overpass(lat, lon, radius);
+      } catch {
+        /* fall through to the name search */
+      }
+    }
     const box = viewbox(lat, lon, radius);
     const spots: Hotspot[] = [];
     const seen = new Set<string>();
-    const queries = q ? [q] : SEARCHES;
+    const queries = q && !q.startsWith("[") ? [q] : SEARCHES;
     for (const query of queries) {
       const rows = await nominatim({
         format: "jsonv2",

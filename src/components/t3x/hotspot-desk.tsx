@@ -40,15 +40,6 @@ function markers(center: Place | null, spots: Hotspot[]): MapDot[] {
   return dots;
 }
 
-const STEPS: { q: string; label: string }[] = [
-  { q: "[library]", label: "libraries" },
-  { q: "[cafe]", label: "cafés" },
-  { q: "[community_centre]", label: "community rooms" },
-  { q: "[university]", label: "universities" },
-  { q: "[hostel]", label: "hostels" },
-  { q: "[hotel]", label: "hotels" },
-];
-
 export type ScanFix = { lat: number; lon: number; acc: number; id: number };
 
 function directionsUrl(lat: number, lon: number): string {
@@ -81,6 +72,7 @@ export function HotspotDesk({
   const [joinNote, setJoinNote] = useState("");
   const [status, setStatus] = useState("");
   const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [shared, setShared] = useState("");
 
   const visible = useMemo(() => {
     return spots
@@ -110,25 +102,23 @@ export function HotspotDesk({
     setCenter({ lat, lon, label });
     setBusy("scan");
     setError("");
+    setShared("");
     setRadius(nextRadius);
-    const merged = new Map<string, Hotspot>();
+    setStatus("Scanning mapped places…");
     try {
-      for (const step of STEPS) {
-        setStatus(`Scanning ${step.label}…`);
-        const rows = await searchHotspots({ data: { lat, lon, radius: nextRadius, q: step.q } });
-        for (const row of rows) merged.set(row.id, row);
-        setSpots([...merged.values()].sort((a, b) => a.distanceM - b.distanceM));
-      }
-      const named = [...merged.values()].find((row) => row.free && row.ssid) || [...merged.values()].find((row) => row.ssid);
+      const rows = await searchHotspots({ data: { lat, lon, radius: nextRadius } });
+      const merged = [...rows].sort((a, b) => a.distanceM - b.distanceM);
+      setSpots(merged);
+      const named = merged.find((row) => row.free && row.ssid) || merged.find((row) => row.ssid);
       if (named?.ssid) onNamed(named.ssid);
-      if (widen && merged.size < 2 && nextRadius < 4000) {
+      if (widen && merged.length < 2 && nextRadius < 4000) {
         setStatus("Almost nothing that close. Opening the scan to 4 km…");
         await scan(lat, lon, label, 4000, false);
         return;
       }
-      setStatus(merged.size === 0 ? "No mapped places in this scan." : `${merged.size} places`);
+      setStatus(merged.length === 0 ? "No mapped places in this scan." : `${merged.length} places`);
     } catch (reason) {
-      if (merged.size === 0) setSpots([]);
+      setSpots([]);
       setError(reason instanceof Error ? reason.message : "Hotspot search failed.");
     } finally {
       setBusy(null);
@@ -211,20 +201,36 @@ export function HotspotDesk({
   }
 
   async function shareScan() {
-    const lines = visible
-      .slice(0, 8)
-      .map((spot) => `${spot.name} · ${formatDistance(spot.distanceM)}`)
-      .join("\n");
-    const text = lines ? `T3x Link scan\n${lines}` : "T3x Link scan";
+    const lines = visible.slice(0, 12).map((spot) => {
+      const bits = [spot.name, formatDistance(spot.distanceM), spot.kindLabel];
+      if (spot.ssid) bits.push(spot.ssid);
+      if (spot.address) bits.push(spot.address);
+      return bits.join(" · ");
+    });
+    const text = ["T3x Link scan", center?.label || "", ...lines].filter(Boolean).join("\n");
+    setError("");
+    setShared(text);
+    const file = new File([text], "t3x-scan.txt", { type: "text/plain" });
     try {
-      if (navigator.share) await navigator.share({ title: "T3x Link scan", text });
-      else {
-        await navigator.clipboard.writeText(text);
-        setStatus("Scan copied.");
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "T3x Link scan" });
+        setStatus("Scan shared.");
+        return;
+      }
+      if (navigator.share) {
+        await navigator.share({ title: "T3x Link scan", text });
+        setStatus("Scan shared.");
+        return;
       }
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "";
-      if (!/abort|cancel/i.test(message)) setError("Could not share that scan.");
+      if (/abort|cancel/i.test(message)) return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("Copied. Paste it into a message.");
+    } catch {
+      setStatus("Select the scan below and copy it.");
     }
   }
 
@@ -337,6 +343,11 @@ export function HotspotDesk({
               <Share2 aria-hidden="true" size={16} />
               Share this scan
             </button>
+          ) : null}
+          {shared ? (
+            <p className="whitespace-pre-wrap text-base text-fg" style={{ overflowWrap: "anywhere" }}>
+              {shared}
+            </p>
           ) : null}
           {center && !busy && !error && visible.length === 0 ? (
             <p className="text-base text-fg">

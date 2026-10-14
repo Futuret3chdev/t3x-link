@@ -5,6 +5,7 @@ import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
 import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
+import { OpenNetDesk } from "@/components/t3x/open-net";
 import { StarlinkDesk } from "@/components/t3x/starlink-desk";
 import { useLink } from "@/components/t3x/use-link";
 import { joinOpenWifi } from "@/lib/net/wifi-join";
@@ -188,6 +189,7 @@ export function Command() {
           </button>
           {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
         </section>
+        <OpenNetDesk onNamed={setNetwork} />
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (
             <button

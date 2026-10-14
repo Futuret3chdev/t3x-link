@@ -5,8 +5,10 @@ const JOURNAL = "t3x-link-journal";
 const BENCH = "t3x-link-bench";
 const SKY = "t3x-link-sky";
 const PINGS = "t3x-link-pings";
+const NETS = "t3x-open-nets";
 
 export type PingMark = { at: number; pingMs: number };
+export type OpenNet = { id: string; at: number; name: string; note: string };
 
 const listeners = new Set<() => void>();
 let lastSummary = "";
@@ -93,4 +95,18 @@ export function pushPing(pingMs: number) {
   const last = rows[rows.length - 1];
   if (last && now - last.at < 8000) return;
   write(PINGS, [...rows, { at: now, pingMs: Math.round(pingMs) }].slice(-12));
+}
+
+export function readNets(): OpenNet[] {
+  const rows = read<OpenNet[]>(NETS, []);
+  return Array.isArray(rows) ? rows.filter((row) => typeof row.name === "string" && row.name.length > 0) : [];
+}
+
+export function saveNet(net: OpenNet) {
+  const rows = readNets().filter((row) => row.id !== net.id && row.name !== net.name);
+  write(NETS, [net, ...rows].slice(0, 12));
+}
+
+export function removeNet(id: string) {
+  write(NETS, readNets().filter((row) => row.id !== id));
 }

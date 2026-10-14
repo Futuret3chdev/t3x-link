@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatMs } from "@/lib/net/format";
-import { readBenchHistory, readJournal, readPings, subscribeMemory, type PingMark } from "@/lib/net/memory";
+import { readBenchHistory, readJoin, readJournal, readPings, subscribeMemory, type JoinTry, type PingMark } from "@/lib/net/memory";
+import { DishTool } from "@/components/t3x/dish-tool";
 import { runTool, type ToolKind, type ToolReport } from "@/lib/net/tools";
 import type { BenchResult, JournalEntry } from "@/lib/net/types";
 import type { LinkModel } from "@/components/t3x/use-link";
@@ -27,6 +28,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const [upTrail, setUpTrail] = useState<number[]>([]);
   const [liveLoaded, setLiveLoaded] = useState<number | null>(null);
   const [logPage, setLogPage] = useState(0);
+  const [joinTry, setJoinTry] = useState<JoinTry | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -90,6 +92,17 @@ export function HubDesk({ model }: { model: LinkModel }) {
     return () => {
       stop = true;
       window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setJoinTry(readJoin());
+    sync();
+    window.addEventListener("pageshow", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      window.removeEventListener("pageshow", sync);
+      document.removeEventListener("visibilitychange", sync);
     };
   }, []);
 
@@ -171,6 +184,15 @@ export function HubDesk({ model }: { model: LinkModel }) {
         <p className="text-base text-fg">No alerts on this path.</p>
       )}
 
+      {joinTry ? (
+        <section className="card grid gap-1">
+          <p className="kicker">After {joinTry.name}</p>
+          <p className="text-lg font-semibold">
+            {link && !link.online ? "Link down" : `Link up · ${formatMs(pings.at(-1)?.pingMs ?? ping)}`}
+          </p>
+        </section>
+      ) : null}
+
       {pings.length > 1 ? (
         <div className="card">
           <p className="stat-label">Ping trail</p>
@@ -247,6 +269,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
             ))}
           </div>
         ) : null}
+        <DishTool ping={pings.at(-1)?.pingMs ?? ping} down={downShown} />
       </section>
 
       {journal.length > 0 ? (

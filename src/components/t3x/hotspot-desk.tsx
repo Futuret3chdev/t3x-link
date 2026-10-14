@@ -3,7 +3,7 @@ import { Bluetooth, LocateFixed, MapPin, Search, Share2, Wifi } from "lucide-rea
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { FleetGlobe } from "@/components/t3x/fleet-globe";
 import { formatDistance, wifiUri } from "@/lib/net/format";
-import { saveNote } from "@/lib/net/memory";
+import { saveNote, readPlaceName, savePlaceName, markJoin } from "@/lib/net/memory";
 import { pickBluetooth, scanNearbyRadios } from "@/lib/net/phone";
 import { geocodePlace, searchHotspots } from "@/lib/net/places";
 import type { FieldKind, Hotspot } from "@/lib/net/types";
@@ -108,8 +108,11 @@ export function HotspotDesk({
   async function connect(spot: Hotspot) {
     setJoinNote("");
     setError("");
+    const name = (spot.ssid || joinName).trim();
+    savePlaceName(spot.id, name);
+    markJoin(name, null);
     try {
-      setJoinNote(await joinOpenWifi(spot.ssid || joinName));
+      setJoinNote(await joinOpenWifi(name));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start the join.");
     }
@@ -511,8 +514,9 @@ export function HotspotDesk({
                 if (id === "here") return;
                 setPickedId(id);
                 const spot = spots.find((row) => row.id === id);
-                setJoinName(spot?.ssid || spot?.name || "");
-                if (spot) showOnMap(spot);
+                if (!spot) return;
+                setJoinName(readPlaceName(spot.id) || spot.ssid || spot.name || "");
+                showOnMap(spot);
               }}
               className="h-72 w-full rounded-card border border-line sm:h-80 lg:h-[32rem]"
             />
@@ -527,7 +531,10 @@ export function HotspotDesk({
                   <input
                     className="field"
                     value={joinName}
-                    onChange={(event) => setJoinName(event.target.value)}
+                    onChange={(event) => {
+                      setJoinName(event.target.value);
+                      if (picked) savePlaceName(picked.id, event.target.value);
+                    }}
                     placeholder="Network name"
                     autoComplete="off"
                   />

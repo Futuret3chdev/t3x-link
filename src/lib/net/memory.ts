@@ -6,6 +6,8 @@ const BENCH = "t3x-link-bench";
 const SKY = "t3x-link-sky";
 const PINGS = "t3x-link-pings";
 const NETS = "t3x-open-nets";
+const PLACES = "t3x-place-names";
+const JOIN = "t3x-join-try";
 
 export type PingMark = { at: number; pingMs: number };
 export type OpenNet = { id: string; at: number; name: string; note: string; known?: boolean };
@@ -95,6 +97,39 @@ export function pushPing(pingMs: number) {
   const last = rows[rows.length - 1];
   if (last && now - last.at < 1500) return;
   write(PINGS, [...rows, { at: now, pingMs: Math.round(pingMs) }].slice(-30));
+}
+
+export function readPlaceName(id: string): string {
+  const rows = read<Record<string, string>>(PLACES, {});
+  return rows && typeof rows[id] === "string" ? rows[id] : "";
+}
+
+export function savePlaceName(id: string, name: string) {
+  const trimmed = name.trim();
+  if (!id || !trimmed) return;
+  const rows = read<Record<string, string>>(PLACES, {});
+  write(PLACES, { ...rows, [id]: trimmed });
+}
+
+export type JoinTry = { name: string; at: number; ping: number | null };
+
+export function markJoin(name: string, ping: number | null) {
+  if (typeof sessionStorage === "undefined") return;
+  const row: JoinTry = { name: name.trim(), at: Date.now(), ping };
+  sessionStorage.setItem(JOIN, JSON.stringify(row));
+}
+
+export function readJoin(): JoinTry | null {
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(JOIN);
+    if (!raw) return null;
+    const row = JSON.parse(raw) as JoinTry;
+    if (!row?.name || Date.now() - row.at > 60 * 60 * 1000) return null;
+    return row;
+  } catch {
+    return null;
+  }
 }
 
 export function readNets(): OpenNet[] {

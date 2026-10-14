@@ -4,6 +4,7 @@ import mark from "@/assets/t3x-mark.jpg";
 import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
 import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
+import { HubDesk } from "@/components/t3x/hub-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
 import { OpenNetDesk, addMyHotspot } from "@/components/t3x/open-net";
 import { StarlinkDesk } from "@/components/t3x/starlink-desk";
@@ -11,6 +12,7 @@ import { useLink } from "@/components/t3x/use-link";
 import { joinOpenWifi, readHotspotName } from "@/lib/net/wifi-join";
 
 const TABS = [
+  { id: "hub", label: "Hub" },
   { id: "link", label: "Link" },
   { id: "hotspots", label: "Hotspots" },
   { id: "starlink", label: "Starlink" },
@@ -67,7 +69,7 @@ function OpenFilm({ onDone }: { onDone: () => void }) {
 
 export function Command() {
   const model = useLink();
-  const [tab, setTab] = useState<TabId>("hotspots");
+  const [tab, setTab] = useState<TabId>("hub");
   const [fix, setFix] = useState<ScanFix | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState("");
@@ -197,6 +199,9 @@ export function Command() {
           ))}
         </div>
 
+        <div role="tabpanel" id="panel-hub" aria-labelledby="tab-hub" hidden={tab !== "hub"}>
+          {tab === "hub" ? <HubDesk model={model} /> : null}
+        </div>
         <div role="tabpanel" id="panel-link" aria-labelledby="tab-link" hidden={tab !== "link"}>
           {tab === "link" ? <LinkDesk model={model} /> : null}
         </div>

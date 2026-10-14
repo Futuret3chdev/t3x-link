@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LocateFixed, Wifi } from "lucide-react";
 import mark from "@/assets/t3x-mark.jpg";
 import { BenchDesk } from "@/components/t3x/bench-desk";
@@ -19,6 +19,48 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+function OpenFilm({ onDone }: { onDone: () => void }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [sound, setSound] = useState(false);
+
+  useEffect(() => {
+    const node = video.current;
+    if (!node) return;
+    node.muted = true;
+    void node.play().catch(() => undefined);
+  }, []);
+
+  function withSound() {
+    const node = video.current;
+    if (!node) return;
+    node.muted = false;
+    setSound(true);
+    void node.play().catch(() => undefined);
+  }
+
+  return (
+    <div className="intro" role="dialog" aria-modal="true" aria-label="T3x Link">
+      <video
+        ref={video}
+        className="intro-video"
+        src="/promo.mp4"
+        playsInline
+        autoPlay
+        muted
+        onEnded={onDone}
+      />
+      <button type="button" className="btn btn-primary intro-skip" onClick={onDone}>
+        Skip
+      </button>
+      {sound ? null : (
+        <button type="button" className="btn btn-accent intro-sound" onClick={withSound}>
+          Sound
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function Command() {
   const model = useLink();
   const [tab, setTab] = useState<TabId>("hotspots");
@@ -27,8 +69,26 @@ export function Command() {
   const [scanNote, setScanNote] = useState("");
   const [network, setNetwork] = useState("");
   const [joinNote, setJoinNote] = useState("");
-  const [filmNote, setFilmNote] = useState("");
+  const [intro, setIntro] = useState(false);
   const online = model.link?.online !== false;
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("t3x-intro") === "1") return;
+    } catch {
+      /* private mode */
+    }
+    setIntro(true);
+  }, []);
+
+  function closeIntro() {
+    try {
+      sessionStorage.setItem("t3x-intro", "1");
+    } catch {
+      /* private mode */
+    }
+    setIntro(false);
+  }
 
   function scanNow() {
     setTab("hotspots");
@@ -56,35 +116,6 @@ export function Command() {
     );
   }
 
-  async function saveFilm() {
-    setFilmNote("Preparing the film…");
-    try {
-      const response = await fetch("/promo.mp4");
-      if (!response.ok) throw new Error("missing");
-      const blob = await response.blob();
-      const file = new File([blob], "T3x-Link-Futuret3ch.mp4", { type: "video/mp4" });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "T3x Link" });
-        setFilmNote("Choose Save to Files.");
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "T3x-Link-Futuret3ch.mp4";
-      link.click();
-      URL.revokeObjectURL(url);
-      setFilmNote("Download started.");
-    } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "";
-      if (/abort|cancel/i.test(message)) {
-        setFilmNote("");
-        return;
-      }
-      setFilmNote("Could not save the film. Try again.");
-    }
-  }
-
   async function connect() {
     setJoinNote("");
     if (!network.trim()) {
@@ -100,6 +131,7 @@ export function Command() {
 
   return (
     <div className="shell bg-bg text-fg">
+      {intro ? <OpenFilm onDone={closeIntro} /> : null}
       <div className="rule" />
       <header className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
         <img
@@ -155,10 +187,6 @@ export function Command() {
             Connect
           </button>
           {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
-          <button type="button" className="btn btn-ghost w-full" onClick={() => void saveFilm()}>
-            Save the promo
-          </button>
-          {filmNote ? <p className="text-base text-fg">{filmNote}</p> : null}
         </section>
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (

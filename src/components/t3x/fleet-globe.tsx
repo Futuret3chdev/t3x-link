@@ -46,9 +46,16 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
   const rows = useRef<Row[]>([]);
   const [dots, setDots] = useState<FleetDot[]>([]);
   const [rot, setRot] = useState(145);
+  const [zoom, setZoom] = useState(1);
   const [picked, setPicked] = useState<FleetDot | null>(null);
   const [note, setNote] = useState("Reading orbits…");
   const drag = useRef<{ x: number; rot: number; moved: boolean } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef(0);
+
+  function scaleBy(delta: number) {
+    setZoom((value) => Math.max(1, Math.min(4, Math.round((value + delta) * 20) / 20)));
+  }
 
   useEffect(() => {
     let stop = false;
@@ -94,7 +101,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
     ctx.clearRect(0, 0, width, height);
     const cx = width / 2;
     const cy = height / 2;
-    const radius = Math.min(width, height) * 0.36;
+    const radius = Math.min(width, height) * 0.36 * zoom;
     ctx.beginPath();
     ctx.fillStyle = "#163e72";
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -162,7 +169,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
     ctx.lineWidth = 1.5;
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
-  }, [dots, observer, rot]);
+  }, [dots, observer, rot, zoom]);
 
   function pickAt(clientX: number, clientY: number) {
     const frame = box.current;
@@ -170,7 +177,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
     const rect = frame.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
-    const radius = Math.min(rect.width, rect.height) * 0.36;
+    const radius = Math.min(rect.width, rect.height) * 0.36 * zoom;
     let best: FleetDot | null = null;
     let bestD = 22;
     for (const dot of dots) {
@@ -193,25 +200,55 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
       <div
         ref={box}
         className="desk-map h-80 w-full sm:h-[28rem]"
+        style={{ touchAction: "none" }}
         onPointerDown={(event) => {
+          pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          const pair = [...pointers.current.values()];
+          pinch.current = pair.length >= 2 ? Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y) : 0;
           drag.current = { x: event.clientX, rot, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
+          if (!pointers.current.has(event.pointerId)) return;
+          pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          const pair = [...pointers.current.values()];
+          if (pair.length >= 2 && pinch.current > 0) {
+            const next = Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y);
+            const ratio = next / pinch.current;
+            if (ratio > 1.08 || ratio < 0.92) {
+              pinch.current = next;
+              scaleBy(ratio > 1 ? 0.15 : -0.15);
+            }
+            if (drag.current) drag.current.moved = true;
+            return;
+          }
           if (!drag.current) return;
           const dx = event.clientX - drag.current.x;
           if (Math.abs(dx) > 6) drag.current.moved = true;
           setRot(drag.current.rot + dx * 0.45);
         }}
         onPointerUp={(event) => {
+          pointers.current.delete(event.pointerId);
           const moved = drag.current?.moved;
-          drag.current = null;
+          if (pointers.current.size === 0) drag.current = null;
           if (!moved) pickAt(event.clientX, event.clientY);
+        }}
+        onPointerCancel={(event) => {
+          pointers.current.delete(event.pointerId);
+          drag.current = null;
         }}
       >
         <canvas ref={canvas} className="h-full w-full" />
+        <div className="map-tools">
+          <button type="button" className="map-zoom" onClick={() => scaleBy(0.35)} aria-label="Zoom in">
+            +
+          </button>
+          <button type="button" className="map-zoom" onClick={() => scaleBy(-0.35)} aria-label="Zoom out">
+            −
+          </button>
+        </div>
       </div>
-      <p className="text-base text-fg">{note || `${dots.length.toLocaleString()} satellites. Drag to turn. Tap a dot.`}</p>
+      <p className="text-base text-fg">{note || `${dots.length.toLocaleString()} satellites. Drag to turn. Pinch or use + to zoom.`}</p>
       {picked ? (
         <article className="card grid gap-1">
           <p className="text-lg font-semibold">{picked.name}</p>

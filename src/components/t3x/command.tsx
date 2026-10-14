@@ -27,6 +27,7 @@ export function Command() {
   const [scanNote, setScanNote] = useState("");
   const [network, setNetwork] = useState("");
   const [joinNote, setJoinNote] = useState("");
+  const [filmNote, setFilmNote] = useState("");
   const online = model.link?.online !== false;
 
   function scanNow() {
@@ -53,6 +54,35 @@ export function Command() {
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
+  }
+
+  async function saveFilm() {
+    setFilmNote("Preparing the film…");
+    try {
+      const response = await fetch("/promo.mp4");
+      if (!response.ok) throw new Error("missing");
+      const blob = await response.blob();
+      const file = new File([blob], "T3x-Link-Futuret3ch.mp4", { type: "video/mp4" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "T3x Link" });
+        setFilmNote("Choose Save to Files.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "T3x-Link-Futuret3ch.mp4";
+      link.click();
+      URL.revokeObjectURL(url);
+      setFilmNote("Download started.");
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "";
+      if (/abort|cancel/i.test(message)) {
+        setFilmNote("");
+        return;
+      }
+      setFilmNote("Could not save the film. Try again.");
+    }
   }
 
   async function connect() {
@@ -125,9 +155,10 @@ export function Command() {
             Connect
           </button>
           {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
-          <a className="text-base font-semibold text-primary" href="/walkthrough.mp4">
-            3 minute walkthrough
-          </a>
+          <button type="button" className="btn btn-ghost w-full" onClick={() => void saveFilm()}>
+            Save the promo
+          </button>
+          {filmNote ? <p className="text-base text-fg">{filmNote}</p> : null}
         </section>
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (

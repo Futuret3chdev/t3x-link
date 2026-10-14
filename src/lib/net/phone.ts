@@ -88,7 +88,7 @@ export async function scanNearbyRadios(onFound: (name: string) => void): Promise
       addEventListener: (type: string, listener: (event: { name?: string; device?: { name?: string } }) => void) => void;
     };
   };
-  if (!nav.bluetooth) return "This phone does not let a website scan Wi-Fi names.";
+  if (!nav.bluetooth) return "";
   if (nav.bluetooth.requestLEScan) {
     await nav.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
     nav.bluetooth.addEventListener("advertisementreceived", (event) => {

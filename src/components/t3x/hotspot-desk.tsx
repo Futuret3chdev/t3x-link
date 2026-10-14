@@ -134,14 +134,16 @@ export function HotspotDesk({
 
   async function scanRadios() {
     setError("");
-    setNearby([]);
+    locate(1500);
+    if (!("bluetooth" in navigator)) return;
     try {
       const note = await scanNearbyRadios((name) => {
         setNearby((rows) => (rows.includes(name) ? rows : [...rows, name].slice(0, 12)));
       });
-      setStatus(note);
+      if (note && !note.includes("does not let")) setStatus(note);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The nearby scan stopped.");
+      const message = reason instanceof Error ? reason.message : "";
+      if (message && !/cancel|abort/i.test(message)) setError(message);
     }
   }
 
@@ -290,7 +292,7 @@ export function HotspotDesk({
         <p className="kicker">Public hotspots</p>
         <h2 className="mt-2 text-2xl font-semibold">Scan around this phone</h2>
         <p className="mt-2 text-base text-fg">
-          Scan reads your location, then lists mapped libraries, cafés, universities, hostels, hotels, and community rooms. It cannot read Wi-Fi names. Those only appear if the map published them.
+          Scan places finds mapped libraries, cafés, universities, hostels, hotels, and community rooms around this phone.
         </p>
         <button type="button" className="btn btn-primary mt-4 w-full text-lg" onClick={() => locate(1500)} disabled={busy !== null}>
           <LocateFixed aria-hidden="true" size={18} />

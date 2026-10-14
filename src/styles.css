@@ -379,6 +379,18 @@
     padding-bottom: 0.25rem;
   }
 
+  .tab-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .tab-wrap .tab {
+    flex: 1 1 30%;
+    text-align: center;
+  }
+
   .plain-text,
   a[href^="x-apple-data-detectors"] {
     color: inherit !important;

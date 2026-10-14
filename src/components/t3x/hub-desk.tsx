@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrackerDesk } from "@/components/t3x/tracker-desk";
 import { formatMbps, formatMs } from "@/lib/net/format";
 import { readBenchHistory, readJournal, readPings, subscribeMemory, type PingMark } from "@/lib/net/memory";
 import { runTool, type ToolKind, type ToolReport } from "@/lib/net/tools";
@@ -158,8 +157,6 @@ export function HubDesk({ model }: { model: LinkModel }) {
           </article>
         </section>
       ) : null}
-
-      <TrackerDesk model={model} />
 
       <section className="card grid gap-3">
         <p className="kicker">Paths</p>

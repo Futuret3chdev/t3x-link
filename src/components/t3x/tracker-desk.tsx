@@ -248,7 +248,7 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
     <section className="card grid gap-3">
       <p className="kicker">Tracker</p>
       <h2 className="text-2xl font-semibold">{mode === "launches" ? "Launches" : mode === "passes" ? "Next passes" : "What is overhead"}</h2>
-      <div className="scroll-row">
+      <div className="tab-wrap">
         {(
           [
             ["up", "Overhead"],
@@ -267,29 +267,53 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
           {!launchError && launches.length === 0 ? <p className="text-base text-fg">Reading the launch list…</p> : null}
           {nextUp ? (
             <article className="launch-hero">
-              <p className="kicker">{nextUp.status}</p>
+              <p className="kicker">Upcoming</p>
+              <p className="text-base font-semibold">{nextUp.status}</p>
               <p className="stat-value">{remaining(nextUp.at, now)}</p>
-              <p className="text-lg font-semibold">{nextUp.name}</p>
+              <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
+                {nextUp.name}
+              </p>
               <p className="text-base text-fg">
                 {new Date(nextUp.at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 {nextUp.rocket ? ` · ${nextUp.rocket}` : ""}
               </p>
               {nextUp.provider ? <p className="text-base text-fg">{nextUp.provider}</p> : null}
               {nextUp.pad ? <p className="text-base text-fg">{nextUp.pad}</p> : null}
-              {nextUp.mission ? <p className="text-base text-fg">{nextUp.mission.slice(0, 220)}</p> : null}
+              {nextUp.mission ? <p className="text-base text-fg">{nextUp.mission.slice(0, 180)}</p> : null}
             </article>
           ) : null}
+          {launches.some((row) => row.upcoming && row.id !== nextUp?.id) ? <p className="kicker">Also coming up</p> : null}
           <ul className="grid gap-3">
             {launches
-              .filter((row) => row.id !== nextUp?.id)
+              .filter((row) => row.upcoming && row.id !== nextUp?.id)
               .map((row) => (
-                <li key={row.id} className="grid gap-1">
-                  <p className="text-lg font-semibold">{row.name}</p>
-                  <p className="text-base text-fg">
-                    {row.upcoming ? remaining(row.at, now) : "Recent"} · {new Date(row.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                    {row.rocket ? ` · ${row.rocket}` : ""}
-                  </p>
-                  {row.pad ? <p className="text-base text-fg">{row.pad}</p> : null}
+                <li key={row.id} className="pass-card">
+                  <p className="text-lg font-semibold">{remaining(row.at, now)}</p>
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
+                      {row.name}
+                    </p>
+                    <p className="text-base text-fg">{row.pad || row.rocket}</p>
+                  </div>
+                </li>
+              ))}
+          </ul>
+          <p className="kicker">Previous</p>
+          <ul className="grid gap-3">
+            {launches
+              .filter((row) => !row.upcoming)
+              .map((row) => (
+                <li key={row.id} className="pass-card">
+                  <p className="text-lg font-semibold">Done</p>
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
+                      {row.name}
+                    </p>
+                    <p className="text-base text-fg">
+                      {new Date(row.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                      {row.pad ? ` · ${row.pad}` : ""}
+                    </p>
+                  </div>
                 </li>
               ))}
           </ul>
@@ -299,7 +323,7 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
           <p className="text-base text-fg">
             {observer ? `${sky.length} above the horizon.` : "Waiting for a location."} Public orbit data for this minute.
           </p>
-          <div className="scroll-row">
+          <div className="tab-wrap">
             {GROUPS.map((item) => (
               <button key={item.id} type="button" className="tab" aria-pressed={group === item.id} onClick={() => setGroup(item.id)}>
                 {item.label}

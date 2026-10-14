@@ -7,16 +7,16 @@ import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
 import { HubDesk } from "@/components/t3x/hub-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
 import { OpenNetDesk } from "@/components/t3x/open-net";
-import { StarlinkDesk } from "@/components/t3x/starlink-desk";
+import { PlanetsDesk } from "@/components/t3x/planets-desk";
 import { useLink } from "@/components/t3x/use-link";
 
 const TABS = [
   { id: "hub", label: "Hub" },
+  { id: "planets", label: "Planets" },
   { id: "link", label: "Link" },
-  { id: "hotspots", label: "Hotspots" },
-  { id: "starlink", label: "Starlink" },
+  { id: "hotspots", label: "Places" },
   { id: "bench", label: "Bench" },
-  { id: "field", label: "Field notes" },
+  { id: "field", label: "Notes" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -162,7 +162,7 @@ export function Command() {
           {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
           <OpenNetDesk onNamed={() => undefined} />
         </section>
-        <div role="tablist" aria-label="Desks" className="scroll-row">
+        <div role="tablist" aria-label="Desks" className="tab-wrap">
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -190,8 +190,8 @@ export function Command() {
             <HotspotDesk model={model} active fix={fix} onNamed={() => undefined} />
           ) : null}
         </div>
-        <div role="tabpanel" id="panel-starlink" aria-labelledby="tab-starlink" hidden={tab !== "starlink"}>
-          {tab === "starlink" ? <StarlinkDesk model={model} /> : null}
+        <div role="tabpanel" id="panel-planets" aria-labelledby="tab-planets" hidden={tab !== "planets"}>
+          {tab === "planets" ? <PlanetsDesk model={model} /> : null}
         </div>
         <div role="tabpanel" id="panel-bench" aria-labelledby="tab-bench" hidden={tab !== "bench"}>
           {tab === "bench" ? <BenchDesk model={model} /> : null}

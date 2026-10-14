@@ -202,6 +202,22 @@ export function FieldDesk() {
                 onClick={() => {
                   setShareError("");
                   setJoinNote("");
+                  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                    void import("qrcode")
+                      .then((mod) =>
+                        mod.toDataURL(wifiUri({ ssid: ssid.trim(), password: "", security: "nopass", hidden: false }), {
+                          margin: 1,
+                          width: 280,
+                          color: { dark: "#07080d", light: "#f4efe6" },
+                        }),
+                      )
+                      .then((url) => {
+                        setQr(url);
+                        setJoinNote("Point the Camera at this code and tap Join.");
+                      })
+                      .catch(() => setShareError("Could not draw the join code."));
+                    return;
+                  }
                   void joinOpenWifi(ssid).then(
                     (note) => setJoinNote(note),
                     (reason: unknown) =>

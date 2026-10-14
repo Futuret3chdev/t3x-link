@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bluetooth, LocateFixed, MapPin, Search, Share2, Wifi } from "lucide-react";
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { FleetGlobe } from "@/components/t3x/fleet-globe";
-import { formatDistance } from "@/lib/net/format";
+import { formatDistance, wifiUri } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
 import { pickBluetooth } from "@/lib/net/phone";
 import { geocodePlace, searchHotspots } from "@/lib/net/places";
@@ -65,6 +65,7 @@ export function HotspotDesk({
   const [savedId, setSavedId] = useState("");
   const [bleName, setBleName] = useState("");
   const [joinNote, setJoinNote] = useState("");
+  const [joinQr, setJoinQr] = useState("");
   const [status, setStatus] = useState("");
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [shared, setShared] = useState("");
@@ -105,9 +106,22 @@ export function HotspotDesk({
 
   async function connect(spot: Hotspot) {
     setJoinNote("");
+    setJoinQr("");
     setError("");
+    const name = (spot.ssid || joinName).trim();
     try {
-      setJoinNote(await joinOpenWifi(spot.ssid || joinName));
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        const mod = await import("qrcode");
+        const url = await mod.toDataURL(wifiUri({ ssid: name, password: "", security: "nopass", hidden: false }), {
+          margin: 1,
+          width: 320,
+          color: { dark: "#07080d", light: "#f4efe6" },
+        });
+        setJoinQr(url);
+        setJoinNote("Point the Camera at this code and tap Join.");
+        return;
+      }
+      setJoinNote(await joinOpenWifi(name));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start the join.");
     }
@@ -494,6 +508,7 @@ export function HotspotDesk({
                   <Wifi aria-hidden="true" size={16} />
                   Connect
                 </button>
+                {joinQr ? <img src={joinQr} alt="Join code for the camera" className="mx-auto w-44 rounded-lg" /> : null}
                 {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
               </div>
             ) : null}

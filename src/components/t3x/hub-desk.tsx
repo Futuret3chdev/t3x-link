@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { formatMbps, formatMs } from "@/lib/net/format";
+import { formatMs } from "@/lib/net/format";
 import { readBenchHistory, readJournal, readPings, subscribeMemory, type PingMark } from "@/lib/net/memory";
 import { runTool, type ToolKind, type ToolReport } from "@/lib/net/tools";
 import type { BenchResult, JournalEntry } from "@/lib/net/types";
 import type { LinkModel } from "@/components/t3x/use-link";
-
-const ROLES = ["primary", "backup", "off"] as const;
-type Role = (typeof ROLES)[number];
-const ROLE_KEY = "t3x-path-roles";
 
 const TOOLS: { id: ToolKind; label: string }[] = [
   { id: "dns", label: "DNS" },
@@ -16,20 +12,10 @@ const TOOLS: { id: ToolKind; label: string }[] = [
   { id: "https", label: "Site" },
 ];
 
-function readRoles(): Record<string, Role> {
-  try {
-    const raw = JSON.parse(localStorage.getItem(ROLE_KEY) || "{}") as Record<string, Role>;
-    return raw && typeof raw === "object" ? raw : {};
-  } catch {
-    return {};
-  }
-}
-
 export function HubDesk({ model }: { model: LinkModel }) {
   const [pings, setPings] = useState<PingMark[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [bench, setBench] = useState<BenchResult | null>(null);
-  const [roles, setRoles] = useState<Record<string, Role>>({});
   const [host, setHost] = useState("example.com");
   const [tool, setTool] = useState<ToolKind>("dns");
   const [report, setReport] = useState<ToolReport | null>(null);
@@ -43,7 +29,6 @@ export function HubDesk({ model }: { model: LinkModel }) {
       setBench(readBenchHistory()[0] || null);
     };
     sync();
-    setRoles(readRoles());
     return subscribeMemory(sync);
   }, []);
 
@@ -54,19 +39,9 @@ export function HubDesk({ model }: { model: LinkModel }) {
     if (link && !link.online) rows.push("The link is down.");
     if (ping != null && ping >= 250) rows.push("Latency is high on this path.");
     if (link?.saveData) rows.push("The phone is saving data.");
-    const primary = Object.entries(roles).find(([, role]) => role === "primary")?.[0];
-    if (primary && link && link.type !== "unknown" && link.type !== primary) {
-      rows.push(`Live path is ${link.typeLabel}. Your primary is ${primary}.`);
-    }
     if (model.identity?.starlink && ping != null && ping >= 80) rows.push("Starlink is up, but this pass is slower than a clear shot.");
     return rows;
-  }, [link, model.identity?.starlink, ping, roles]);
-
-  function chooseRole(type: string, role: Role) {
-    const next = { ...roles, [type]: role };
-    setRoles(next);
-    localStorage.setItem(ROLE_KEY, JSON.stringify(next));
-  }
+  }, [link, model.identity?.starlink, ping]);
 
   async function ask(event: React.FormEvent) {
     event.preventDefault();
@@ -83,23 +58,20 @@ export function HubDesk({ model }: { model: LinkModel }) {
   }
 
   const peak = Math.max(1, ...pings.map((row) => row.pingMs));
-  const channels = ["wifi", "cellular", link?.type || "wifi"].filter((type, index, all) => type && type !== "unknown" && all.indexOf(type) === index);
 
   return (
     <div className="grid gap-4">
       <section className="card">
         <p className="kicker">Control hub</p>
-        <h2 className="mt-2 text-2xl font-semibold">The path, the sky, the checks</h2>
-        <p className="mt-2 text-base text-fg">
-          Live view of this phone. One radio is in use at a time. The hub watches the handoff. It does not merge Wi-Fi and cellular.
-        </p>
+        <h2 className="mt-2 text-2xl font-semibold">This phone</h2>
+        <p className="mt-2 text-base text-fg">Ping, speed, and a host check. The phone chooses Wi-Fi or cellular. This page cannot switch it.</p>
       </section>
 
       <section className="grid grid-cols-2 gap-3">
         <article className="card">
           <p className="stat-label">Link</p>
           <p className="stat-value mt-2">{link ? (link.online ? link.typeLabel : "Down") : "…"}</p>
-          <p className="mt-1 text-base text-fg">{link?.effectiveLabel || "Waiting"}</p>
+          <p className="mt-1 text-base text-fg">{link?.effectiveLabel || model.identity?.city || "Live"}</p>
         </article>
         <article className="card">
           <p className="stat-label">Ping</p>
@@ -145,11 +117,13 @@ export function HubDesk({ model }: { model: LinkModel }) {
         <section className="grid grid-cols-3 gap-3">
           <article className="card">
             <p className="stat-label">Down</p>
-            <p className="mt-2 text-lg font-semibold">{formatMbps(bench.downMbps)}</p>
+            <p className="stat-value mt-2">{bench.downMbps == null ? "—" : bench.downMbps >= 10 ? bench.downMbps.toFixed(1) : bench.downMbps.toFixed(2)}</p>
+            <p className="text-base text-fg">Mb/s</p>
           </article>
           <article className="card">
             <p className="stat-label">Up</p>
-            <p className="mt-2 text-lg font-semibold">{formatMbps(bench.upMbps)}</p>
+            <p className="stat-value mt-2">{bench.upMbps == null ? "—" : bench.upMbps >= 10 ? bench.upMbps.toFixed(1) : bench.upMbps.toFixed(2)}</p>
+            <p className="text-base text-fg">Mb/s</p>
           </article>
           <article className="card">
             <p className="stat-label">Loaded</p>
@@ -159,37 +133,11 @@ export function HubDesk({ model }: { model: LinkModel }) {
       ) : null}
 
       <section className="card grid gap-3">
-        <p className="kicker">Paths</p>
-        <h2 className="text-2xl font-semibold">Which radio should lead</h2>
-        <p className="text-base text-fg">
-          Set Wi-Fi or cellular as primary, backup, or off. When the phone switches, the alert above says so.
-        </p>
-        {channels.map((type) => (
-          <div key={type} className="grid gap-2">
-            <p className="text-base font-semibold">{type === "wifi" ? "Wi-Fi" : type === "cellular" ? "Cellular" : link?.typeLabel || type}</p>
-            <div className="scroll-row">
-              {ROLES.map((role) => (
-                <button
-                  key={role}
-                  type="button"
-                  className="tab"
-                  aria-pressed={(roles[type] || "backup") === role}
-                  onClick={() => chooseRole(type, role)}
-                >
-                  {role}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="card grid gap-3">
         <p className="kicker">Tools</p>
         <h2 className="text-2xl font-semibold">Check a host</h2>
         <form onSubmit={(event) => void ask(event)} className="grid gap-3">
           <input className="field" value={host} onChange={(event) => setHost(event.target.value)} placeholder="example.com" autoComplete="off" />
-          <div className="scroll-row">
+          <div className="tab-wrap">
             {TOOLS.map((item) => (
               <button key={item.id} type="button" className="tab" aria-pressed={tool === item.id} onClick={() => setTool(item.id)}>
                 {item.label}

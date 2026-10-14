@@ -16,7 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
   wifi: "Wi-Fi",
   wimax: "WiMAX",
   other: "Other",
-  unknown: "Hidden",
+  unknown: "Online",
 };
 
 const EFFECTIVE_LABELS: Record<string, string> = {
@@ -37,9 +37,9 @@ export function readLink(): LinkReading {
   return {
     online: navigator.onLine,
     type,
-    typeLabel: TYPE_LABELS[type] ?? "Hidden",
+    typeLabel: TYPE_LABELS[type] ?? "Online",
     effectiveType,
-    effectiveLabel: EFFECTIVE_LABELS[effectiveType] ?? "Hidden",
+    effectiveLabel: EFFECTIVE_LABELS[effectiveType] ?? "",
     downlink: typeof link?.downlink === "number" ? link.downlink : null,
     rtt: typeof link?.rtt === "number" ? link.rtt : null,
     saveData: Boolean(link?.saveData),

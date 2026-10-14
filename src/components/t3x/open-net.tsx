@@ -1,28 +1,8 @@
 import { useEffect, useState } from "react";
-import { QrCode, Trash2, Wifi } from "lucide-react";
+import { QrCode, Trash2 } from "lucide-react";
 import { wifiUri } from "@/lib/net/format";
-import { readNets, removeNet, saveNet, subscribeMemory, type OpenNet } from "@/lib/net/memory";
-import { joinOpenWifi, openHotspotSettings, readHotspotName } from "@/lib/net/wifi-join";
-
-export function addMyHotspot(onNamed: (ssid: string) => void): string {
-  const ssid = readHotspotName();
-  if (ssid) {
-    saveNet({ id: crypto.randomUUID(), at: Date.now(), name: ssid, note: "Personal Hotspot", known: true });
-    onNamed(ssid);
-    return `Added “${ssid}”, the hotspot already on this phone.`;
-  }
-  const already = readNets().some((row) => row.known === false);
-  if (!already) {
-    saveNet({
-      id: crypto.randomUUID(),
-      at: Date.now(),
-      name: "Personal Hotspot",
-      note: "The one already turned on in Settings.",
-      known: false,
-    });
-  }
-  return openHotspotSettings();
-}
+import { readNets, removeNet, subscribeMemory, type OpenNet } from "@/lib/net/memory";
+import { openHotspotSettings } from "@/lib/net/wifi-join";
 
 export function OpenNetDesk({ onNamed }: { onNamed: (ssid: string) => void }) {
   const [nets, setNets] = useState<OpenNet[]>([]);
@@ -31,14 +11,10 @@ export function OpenNetDesk({ onNamed }: { onNamed: (ssid: string) => void }) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const sync = () => setNets(readNets());
+    const sync = () => setNets(readNets().filter((row) => row.known !== false));
     sync();
     return subscribeMemory(sync);
   }, []);
-
-  function addHotspot() {
-    setMessage(addMyHotspot(onNamed));
-  }
 
   async function card(net: OpenNet) {
     setMessage("");
@@ -59,55 +35,34 @@ export function OpenNetDesk({ onNamed }: { onNamed: (ssid: string) => void }) {
   }
 
   return (
-    <section className="card grid gap-3">
-      <p className="kicker">Your network</p>
-      <h2 className="text-2xl font-semibold">Your hotspot</h2>
-      <p className="text-base text-fg">Uses the Personal Hotspot already on this phone. It does not ask you to make up a name.</p>
-      <button type="button" className="btn btn-accent w-full text-lg" onClick={addHotspot}>
-        <Wifi aria-hidden="true" size={18} />
-        Add my hotspot
-      </button>
+    <div className="grid gap-2">
       {message ? <p className="text-base text-fg">{message}</p> : null}
       {nets.length > 0 ? (
-        <ul className="grid gap-3">
+        <ul className="grid gap-2">
           {nets.map((net) => (
-            <li key={net.id} className="grid gap-2 rounded-xl border border-line p-3">
-              <p className="text-lg font-semibold">{net.name}</p>
-              {net.note ? <p className="text-base text-fg">{net.note}</p> : null}
-              <div className="grid gap-2 sm:grid-cols-2">
+            <li key={net.id} className="flex items-center justify-between gap-3">
+              <p className="min-w-0 text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
+                {net.name}
+              </p>
+              <span className="flex shrink-0 gap-2">
                 {net.known ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary w-full"
-                    onClick={() => {
-                      onNamed(net.name);
-                      void joinOpenWifi(net.name).then(setMessage).catch((reason) => {
-                        setMessage(reason instanceof Error ? reason.message : "Could not start the join.");
-                      });
-                    }}
-                  >
-                    Connect
-                  </button>
-                ) : null}
-                <button type="button" className="btn btn-ghost w-full" onClick={() => setMessage(openHotspotSettings())}>
-                  Hotspot settings
-                </button>
-                {net.known ? (
-                  <button type="button" className="btn btn-ghost w-full" onClick={() => void card(net)}>
+                  <button type="button" className="btn btn-ghost" onClick={() => void card(net)}>
                     <QrCode aria-hidden="true" size={16} />
-                    Join code
+                    Code
                   </button>
                 ) : null}
-                <button type="button" className="btn btn-ghost w-full" onClick={() => removeNet(net.id)}>
+                <button type="button" className="btn btn-ghost" onClick={() => removeNet(net.id)} aria-label={`Remove ${net.name}`}>
                   <Trash2 aria-hidden="true" size={16} />
-                  Remove
                 </button>
-              </div>
-              {active === net.id && qr ? <img src={qr} alt={`Join code for ${net.name}`} className="mx-auto w-44 rounded-lg" /> : null}
+              </span>
             </li>
           ))}
         </ul>
       ) : null}
-    </section>
+      {active && qr ? <img src={qr} alt="Join code" className="mx-auto w-44 rounded-lg" /> : null}
+      <button type="button" className="btn btn-ghost w-full" onClick={() => setMessage(openHotspotSettings())}>
+        Hotspot settings
+      </button>
+    </div>
   );
 }

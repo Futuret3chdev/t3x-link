@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { LocateFixed, Wifi } from "lucide-react";
+import { LocateFixed } from "lucide-react";
 import mark from "@/assets/t3x-mark.jpg";
 import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
 import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
 import { HubDesk } from "@/components/t3x/hub-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
-import { OpenNetDesk, addMyHotspot } from "@/components/t3x/open-net";
+import { OpenNetDesk } from "@/components/t3x/open-net";
 import { StarlinkDesk } from "@/components/t3x/starlink-desk";
 import { useLink } from "@/components/t3x/use-link";
-import { joinOpenWifi, readHotspotName } from "@/lib/net/wifi-join";
 
 const TABS = [
   { id: "hub", label: "Hub" },
@@ -73,7 +72,6 @@ export function Command() {
   const [fix, setFix] = useState<ScanFix | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState("");
-  const [joinNote, setJoinNote] = useState("");
   const [intro, setIntro] = useState(false);
   const online = model.link?.online !== false;
 
@@ -121,18 +119,6 @@ export function Command() {
     );
   }
 
-  function connect() {
-    const note = addMyHotspot(() => undefined);
-    const name = readHotspotName();
-    if (!name) {
-      setJoinNote(note);
-      return;
-    }
-    void joinOpenWifi(name).then(setJoinNote).catch((reason) => {
-      setJoinNote(reason instanceof Error ? reason.message : "Could not start the join.");
-    });
-  }
-
   return (
     <div className="shell bg-bg text-fg">
       {intro ? <OpenFilm onDone={closeIntro} /> : null}
@@ -168,20 +154,14 @@ export function Command() {
 
       <main className="page-pad mx-auto grid max-w-6xl gap-5 px-4 sm:px-6">
         <section className="card grid gap-3">
-          <p className="kicker">Do this</p>
           <button type="button" className="btn btn-primary w-full text-lg" onClick={scanNow} disabled={scanning}>
             <LocateFixed aria-hidden="true" size={18} />
             {scanning ? "Scanning…" : "Scan"}
           </button>
           {scanNote ? <p className="text-base text-fg">{scanNote}</p> : null}
           {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
-          <button type="button" className="btn btn-accent w-full text-lg" onClick={connect}>
-            <Wifi aria-hidden="true" size={18} />
-            Use my hotspot
-          </button>
-          {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
+          <OpenNetDesk onNamed={() => undefined} />
         </section>
-        <OpenNetDesk onNamed={() => undefined} />
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (
             <button

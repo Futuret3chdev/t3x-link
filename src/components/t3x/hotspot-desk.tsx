@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bluetooth, ExternalLink, LocateFixed, MapPin, Search, Wifi } from "lucide-react";
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { formatDistance } from "@/lib/net/format";
@@ -40,7 +40,17 @@ function markers(center: Place | null, spots: Hotspot[]): MapDot[] {
   return dots;
 }
 
-export function HotspotDesk({ model, active }: { model: LinkModel; active: boolean }) {
+export function HotspotDesk({
+  model,
+  active,
+  scanNonce,
+  onNamed,
+}: {
+  model: LinkModel;
+  active: boolean;
+  scanNonce: number;
+  onNamed: (ssid: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [center, setCenter] = useState<Place | null>(null);
   const [radius, setRadius] = useState(1500);
@@ -81,6 +91,8 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
     try {
       const rows = await searchHotspots({ data: { lat, lon, radius: nextRadius } });
       setSpots(rows);
+      const named = rows.find((row) => row.free && row.ssid) || rows.find((row) => row.ssid);
+      if (named?.ssid) onNamed(named.ssid);
     } catch (reason) {
       setSpots([]);
       setError(reason instanceof Error ? reason.message : "Hotspot search failed.");
@@ -108,6 +120,13 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 60_000 },
     );
   }
+
+  useEffect(() => {
+    if (scanNonce < 1) return;
+    locate(800);
+    // scanNonce is the only trigger; locate closes over the latest radius setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanNonce]);
 
   async function bluetooth() {
     setBusy("ble");
@@ -157,13 +176,13 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
     <div className="grid gap-4">
       <section className="card">
         <p className="kicker">Public hotspots</p>
-        <h2 className="mt-2 text-2xl font-semibold">Mapped places with a reason to have internet</h2>
+        <h2 className="mt-2 text-2xl font-semibold">Scan, then connect</h2>
         <p className="mt-2 text-base text-fg">
-          A phone cannot list nearby Wi-Fi names. Detect nearby finds mapped places. Connect only appears when the map published an open network name.
+          Scan uses your location for mapped places. Connect joins an open network by name. This phone will not list Wi-Fi names on its own.
         </p>
-        <button type="button" className="btn btn-primary mt-4 w-full" onClick={() => locate(800)} disabled={busy !== null}>
-          <LocateFixed aria-hidden="true" size={16} />
-          {busy === "locate" ? "Detecting…" : "Detect nearby"}
+        <button type="button" className="btn btn-primary mt-4 w-full text-lg" onClick={() => locate(800)} disabled={busy !== null}>
+          <LocateFixed aria-hidden="true" size={18} />
+          {busy === "locate" || busy === "scan" ? "Scanning…" : "Scan"}
         </button>
         <form onSubmit={(event) => void searchPlace(event)} className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <label className="sr-only" htmlFor="place-query">

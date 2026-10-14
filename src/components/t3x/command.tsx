@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { LocateFixed, Wifi } from "lucide-react";
 import mark from "@/assets/t3x-mark.jpg";
 import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
@@ -6,6 +7,7 @@ import { HotspotDesk } from "@/components/t3x/hotspot-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
 import { StarlinkDesk } from "@/components/t3x/starlink-desk";
 import { useLink } from "@/components/t3x/use-link";
+import { joinOpenWifi } from "@/lib/net/wifi-join";
 
 const TABS = [
   { id: "link", label: "Link" },
@@ -19,8 +21,24 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function Command() {
   const model = useLink();
-  const [tab, setTab] = useState<TabId>("link");
+  const [tab, setTab] = useState<TabId>("hotspots");
+  const [scanNonce, setScanNonce] = useState(0);
+  const [network, setNetwork] = useState("");
+  const [joinNote, setJoinNote] = useState("");
   const online = model.link?.online !== false;
+
+  async function connect() {
+    setJoinNote("");
+    if (!network.trim()) {
+      setJoinNote("Type the open network name, then tap Connect.");
+      return;
+    }
+    try {
+      setJoinNote(await joinOpenWifi(network));
+    } catch (reason) {
+      setJoinNote(reason instanceof Error ? reason.message : "Could not start the join.");
+    }
+  }
 
   return (
     <div className="shell bg-bg text-fg">
@@ -55,9 +73,47 @@ export function Command() {
       </header>
 
       <main className="page-pad mx-auto grid max-w-6xl gap-5 px-4 sm:px-6">
-        <p className="text-base text-fg">
-          Read this connection, find mapped public hotspots, watch the Starlink fleet, and bench the path.
-        </p>
+        <section className="card grid gap-3">
+          <p className="kicker">Do this</p>
+          <button
+            type="button"
+            className="btn btn-primary w-full text-lg"
+            onClick={() => {
+              setTab("hotspots");
+              setScanNonce((value) => value + 1);
+            }}
+          >
+            <LocateFixed aria-hidden="true" size={18} />
+            Scan
+          </button>
+          <label className="grid gap-1 text-base font-semibold" htmlFor="open-network">
+            Open network name
+            <input
+              id="open-network"
+              className="field"
+              value={network}
+              autoComplete="off"
+              placeholder="Type the Wi-Fi name"
+              onChange={(event) => setNetwork(event.target.value)}
+            />
+          </label>
+          <button type="button" className="btn btn-accent w-full text-lg" onClick={() => void connect()}>
+            <Wifi aria-hidden="true" size={18} />
+            Connect
+          </button>
+          {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
+          <p className="kicker">Promo</p>
+          <video
+            className="max-h-[50vh] w-full rounded-xl bg-black object-contain"
+            controls
+            playsInline
+            preload="metadata"
+            poster="/promo-poster.jpg"
+            src="/promo.mp4"
+          >
+            Futuret3ch and T3x
+          </video>
+        </section>
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (
             <button
@@ -79,7 +135,14 @@ export function Command() {
           {tab === "link" ? <LinkDesk model={model} /> : null}
         </div>
         <div role="tabpanel" id="panel-hotspots" aria-labelledby="tab-hotspots" hidden={tab !== "hotspots"}>
-          {tab === "hotspots" ? <HotspotDesk model={model} active /> : null}
+          {tab === "hotspots" ? (
+            <HotspotDesk
+              model={model}
+              active
+              scanNonce={scanNonce}
+              onNamed={(ssid) => setNetwork((current) => current || ssid)}
+            />
+          ) : null}
         </div>
         <div role="tabpanel" id="panel-starlink" aria-labelledby="tab-starlink" hidden={tab !== "starlink"}>
           {tab === "starlink" ? <StarlinkDesk model={model} /> : null}

@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DishTool } from "@/components/t3x/dish-tool";
 import { formatMbps, formatMs } from "@/lib/net/format";
+import { loadCatalog } from "@/lib/net/elements";
+import { dishGap, prepareElements, projectSky } from "@/lib/net/propagate";
 import type { LinkModel } from "@/components/t3x/use-link";
 
 const KITS = [
@@ -38,7 +40,8 @@ export function StarTools({ model }: { model: LinkModel }) {
   const [kit, setKit] = useState<Kit>("setup");
   const ping = model.path?.pingMs ?? null;
   const down = model.path?.downMbps ?? null;
-  const [block, setBlock] = useState("10");
+  const [skyGap, setSkyGap] = useState<{ missingPct: number; inDish: number; low: number; empty: number } | null>(null);
+  const [gapNote, setGapNote] = useState("");
   const [run, setRun] = useState("30");
   const [rain, setRain] = useState("light");
   const [tree, setTree] = useState("10");
@@ -46,16 +49,33 @@ export function StarTools({ model }: { model: LinkModel }) {
   const [pack, setPack] = useState("300");
   const [dish, setDish] = useState("gen3");
 
-  const sky = useMemo(() => {
-    const pct = Number(block);
-    const add = pct === 0 ? 0 : pct === 10 ? 12 : pct === 25 ? 30 : 55;
-    const speed = pct === 0 ? 1 : pct === 10 ? 0.8 : pct === 25 ? 0.55 : 0.35;
-    return {
-      ping: ping == null ? null : Math.round(ping + add),
-      down: down == null ? null : down * speed,
-      note: pct >= 25 ? "Move the dish until the blockage is under 10%." : "A small gap in the trees is usually fine.",
+  useEffect(() => {
+    if (kit !== "sky") return;
+    const lat = model.identity?.lat;
+    const lon = model.identity?.lon;
+    if (lat == null || lon == null) {
+      setSkyGap(null);
+      setGapNote("Location is not in yet. Open Hub once, then come back.");
+      return;
+    }
+    let cancel = false;
+    setGapNote("Counting Starlink in the dish sky…");
+    loadCatalog({ data: { group: "starlink" } })
+      .then((catalog) => projectSky(prepareElements(catalog.elements), { lat, lon }, () => cancel))
+      .then((sky) => {
+        if (cancel) return;
+        setSkyGap(dishGap(sky));
+        setGapNote("");
+      })
+      .catch((reason: unknown) => {
+        if (cancel) return;
+        setSkyGap(null);
+        setGapNote(reason instanceof Error ? reason.message : "The sky count did not finish.");
+      });
+    return () => {
+      cancel = true;
     };
-  }, [block, down, ping]);
+  }, [kit, model.identity?.lat, model.identity?.lon]);
 
   const cable = useMemo(() => {
     const metres = Number(run);
@@ -93,7 +113,7 @@ export function StarTools({ model }: { model: LinkModel }) {
     <section className="card grid gap-3">
       <p className="kicker">Star-tools</p>
       <h2 className="text-2xl font-semibold">Kits</h2>
-      <p className="text-base text-fg">Each kit starts from the speed on this phone. The rest is an estimate, not a live reading from the dish.</p>
+      <p className="text-base text-fg">Obstruction counts the real Starlink sky above 25°. The other kits estimate from the speed on this phone.</p>
       <div className="tab-wrap">
         {KITS.map(([id, label]) => (
           <button key={id} type="button" className="tab" aria-pressed={kit === id} onClick={() => setKit(id)}>
@@ -103,20 +123,15 @@ export function StarTools({ model }: { model: LinkModel }) {
       </div>
       {kit === "setup" ? <DishTool ping={ping} down={down} /> : null}
       {kit === "sky" ? (
-        <div className="grid gap-3">
-          <Choice
-            value={block}
-            onChange={setBlock}
-            options={[
-              { id: "0", label: "Clear" },
-              { id: "10", label: "10%" },
-              { id: "25", label: "25%" },
-              { id: "40", label: "40%" },
-            ]}
-          />
-          <p className="text-lg font-semibold">{formatMs(sky.ping)}</p>
-          <p className="text-base text-fg">{formatMbps(sky.down)}</p>
-          <p className="text-base text-fg">{sky.note}</p>
+        <div className="grid gap-2">
+          {gapNote ? <p className="text-base text-fg">{gapNote}</p> : null}
+          {skyGap ? (
+            <>
+              <p className="text-lg font-semibold">{skyGap.missingPct}% of the dish sky has no Starlink</p>
+              <p className="text-base text-fg">{skyGap.inDish} above 25°. {skyGap.low} are up but too low for the dish.</p>
+              <p className="text-base text-fg">{skyGap.empty} of 36 sky cells are empty. This is coverage, not trees.</p>
+            </>
+          ) : null}
         </div>
       ) : null}
       {kit === "cable" ? (

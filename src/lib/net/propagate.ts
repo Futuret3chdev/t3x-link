@@ -103,6 +103,26 @@ export async function projectSky(
   return sky;
 }
 
+export function dishGap(sky: SkyDot[]): { inDish: number; low: number; empty: number; cells: number; missingPct: number } {
+  const azSteps = 12;
+  const filled = new Set<string>();
+  let inDish = 0;
+  let low = 0;
+  for (const dot of sky) {
+    if (dot.el < 25) {
+      low += 1;
+      continue;
+    }
+    inDish += 1;
+    const band = dot.el >= 70 ? 2 : dot.el >= 45 ? 1 : 0;
+    const az = Math.min(azSteps - 1, Math.floor(dot.az / (360 / azSteps)));
+    filled.add(`${band}-${az}`);
+  }
+  const cells = 3 * azSteps;
+  const empty = cells - filled.size;
+  return { inDish, low, empty, cells, missingPct: Math.round((empty / cells) * 100) };
+}
+
 export type PassWindow = {
   start: number;
   peak: number;

@@ -25,6 +25,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const [liveUp, setLiveUp] = useState<number | null>(null);
   const [downTrail, setDownTrail] = useState<number[]>([]);
   const [upTrail, setUpTrail] = useState<number[]>([]);
+  const [liveLoaded, setLiveLoaded] = useState<number | null>(null);
   const [logPage, setLogPage] = useState(0);
 
   useEffect(() => {
@@ -45,15 +46,23 @@ export function HubDesk({ model }: { model: LinkModel }) {
       if (stop) return;
       try {
         if (which === "down") {
+          const probe = (async () => {
+            const mark = performance.now();
+            const ping = await fetch(`https://speed.cloudflare.com/__down?bytes=0&r=${Math.random()}`, { cache: "no-store" });
+            await ping.arrayBuffer();
+            return ping.ok ? performance.now() - mark : 0;
+          })();
           const start = performance.now();
           const res = await fetch(`https://speed.cloudflare.com/__down?bytes=400000&r=${Math.random()}`, { cache: "no-store" });
           const body = await res.arrayBuffer();
+          const loaded = await probe;
           const seconds = (performance.now() - start) / 1000;
           const mbps = seconds > 0 ? (body.byteLength * 8) / seconds / 1_000_000 : 0;
           if (!stop && res.ok && mbps > 0) {
             setLiveDown(mbps);
             setDownTrail((rows) => [...rows, mbps].slice(-12));
           }
+          if (!stop && loaded > 0) setLiveLoaded(loaded);
           which = "up";
         } else {
           const bytes = 120_000;
@@ -114,6 +123,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const upPeak = Math.max(1, ...upTrail);
   const downShown = liveDown ?? bench?.downMbps ?? null;
   const upShown = liveUp ?? bench?.upMbps ?? null;
+  const loadedShown = liveLoaded ?? bench?.loadedPingMs ?? null;
   const rate = (value: number | null) => (value == null ? "—" : value >= 10 ? value.toFixed(1) : value.toFixed(2));
 
   return (
@@ -171,7 +181,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
         </div>
       ) : null}
 
-      {downShown != null || upShown != null ? (
+      {downShown != null || upShown != null || loadedShown != null ? (
         <section className="grid grid-cols-3 gap-3">
           <article className="card">
             <p className="stat-label">Down</p>
@@ -199,7 +209,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
           </article>
           <article className="card">
             <p className="stat-label">Loaded</p>
-            <p className="stat-value mt-2">{formatMs(bench?.loadedPingMs ?? null)}</p>
+            <p className="stat-value mt-2">{formatMs(loadedShown)}</p>
           </article>
         </section>
       ) : null}

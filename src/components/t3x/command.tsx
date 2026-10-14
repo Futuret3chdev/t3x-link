@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { LocateFixed } from "lucide-react";
 import mark from "@/assets/t3x-mark.jpg";
 import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
-import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
+import { HotspotDesk } from "@/components/t3x/hotspot-desk";
 import { HubDesk } from "@/components/t3x/hub-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
-import { OpenNetDesk } from "@/components/t3x/open-net";
 import { PlanetsDesk } from "@/components/t3x/planets-desk";
 import { useLink } from "@/components/t3x/use-link";
 
@@ -69,9 +67,6 @@ function OpenFilm({ onDone }: { onDone: () => void }) {
 export function Command() {
   const model = useLink();
   const [tab, setTab] = useState<TabId>("hub");
-  const [fix, setFix] = useState<ScanFix | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [scanNote, setScanNote] = useState("");
   const [intro, setIntro] = useState(false);
   const online = model.link?.online !== false;
 
@@ -91,32 +86,6 @@ export function Command() {
       /* private mode */
     }
     setIntro(false);
-  }
-
-  function scanNow() {
-    setTab("hotspots");
-    setScanNote("");
-    if (!navigator.geolocation) {
-      setScanNote("This phone has no location service.");
-      return;
-    }
-    setScanning(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setScanning(false);
-        setFix({
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy),
-          id: Date.now(),
-        });
-      },
-      () => {
-        setScanning(false);
-        setScanNote("Location is blocked. Allow location for this site, then tap Scan again.");
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-    );
   }
 
   return (
@@ -170,16 +139,6 @@ export function Command() {
           ))}
         </div>
 
-        <section className="card grid gap-3">
-          <button type="button" className="btn btn-primary w-full text-lg" onClick={scanNow} disabled={scanning}>
-            <LocateFixed aria-hidden="true" size={18} />
-            {scanning ? "Scanning…" : "Scan"}
-          </button>
-          {scanNote ? <p className="text-base text-fg">{scanNote}</p> : null}
-          {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
-          <OpenNetDesk onNamed={() => undefined} showSettings={!fix} />
-        </section>
-
         <div role="tabpanel" id="panel-hub" aria-labelledby="tab-hub" hidden={tab !== "hub"}>
           {tab === "hub" ? <HubDesk model={model} /> : null}
         </div>
@@ -188,7 +147,7 @@ export function Command() {
         </div>
         <div role="tabpanel" id="panel-hotspots" aria-labelledby="tab-hotspots" hidden={tab !== "hotspots"}>
           {tab === "hotspots" ? (
-            <HotspotDesk model={model} active fix={fix} onNamed={() => undefined} />
+            <HotspotDesk model={model} active fix={null} onNamed={() => undefined} />
           ) : null}
         </div>
         <div role="tabpanel" id="panel-planets" aria-labelledby="tab-planets" hidden={tab !== "planets"}>

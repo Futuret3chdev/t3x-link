@@ -4,7 +4,7 @@ import { wifiUri } from "@/lib/net/format";
 import { readNets, removeNet, subscribeMemory, type OpenNet } from "@/lib/net/memory";
 import { openHotspotSettings } from "@/lib/net/wifi-join";
 
-export function OpenNetDesk({ onNamed }: { onNamed: (ssid: string) => void }) {
+export function OpenNetDesk({ onNamed, showSettings = true }: { onNamed: (ssid: string) => void; showSettings?: boolean }) {
   const [nets, setNets] = useState<OpenNet[]>([]);
   const [qr, setQr] = useState("");
   const [active, setActive] = useState("");
@@ -34,6 +34,8 @@ export function OpenNetDesk({ onNamed }: { onNamed: (ssid: string) => void }) {
     }
   }
 
+  if (!showSettings && nets.length === 0 && !qr) return null;
+
   return (
     <div className="grid gap-2">
       {message ? <p className="text-base text-fg">{message}</p> : null}
@@ -60,9 +62,11 @@ export function OpenNetDesk({ onNamed }: { onNamed: (ssid: string) => void }) {
         </ul>
       ) : null}
       {active && qr ? <img src={qr} alt="Join code" className="mx-auto w-44 rounded-lg" /> : null}
-      <button type="button" className="btn btn-ghost w-full" onClick={() => setMessage(openHotspotSettings())}>
-        Hotspot settings
-      </button>
+      {showSettings ? (
+        <button type="button" className="btn btn-ghost w-full" onClick={() => setMessage(openHotspotSettings())}>
+          Hotspot settings
+        </button>
+      ) : null}
     </div>
   );
 }

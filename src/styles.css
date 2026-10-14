@@ -391,6 +391,14 @@
     text-align: center;
   }
 
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--color-bg);
+    padding-block: 0.35rem;
+  }
+
   .plain-text,
   a[href^="x-apple-data-detectors"] {
     color: inherit !important;

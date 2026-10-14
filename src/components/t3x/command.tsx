@@ -153,16 +153,7 @@ export function Command() {
       </header>
 
       <main className="page-pad mx-auto grid max-w-6xl gap-5 px-4 sm:px-6">
-        <section className="card grid gap-3">
-          <button type="button" className="btn btn-primary w-full text-lg" onClick={scanNow} disabled={scanning}>
-            <LocateFixed aria-hidden="true" size={18} />
-            {scanning ? "Scanning…" : "Scan"}
-          </button>
-          {scanNote ? <p className="text-base text-fg">{scanNote}</p> : null}
-          {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
-          <OpenNetDesk onNamed={() => undefined} />
-        </section>
-        <div role="tablist" aria-label="Desks" className="tab-wrap">
+        <div role="tablist" aria-label="Desks" className="tab-wrap tab-bar">
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -178,6 +169,16 @@ export function Command() {
             </button>
           ))}
         </div>
+
+        <section className="card grid gap-3">
+          <button type="button" className="btn btn-primary w-full text-lg" onClick={scanNow} disabled={scanning}>
+            <LocateFixed aria-hidden="true" size={18} />
+            {scanning ? "Scanning…" : "Scan"}
+          </button>
+          {scanNote ? <p className="text-base text-fg">{scanNote}</p> : null}
+          {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
+          <OpenNetDesk onNamed={() => undefined} showSettings={!fix} />
+        </section>
 
         <div role="tabpanel" id="panel-hub" aria-labelledby="tab-hub" hidden={tab !== "hub"}>
           {tab === "hub" ? <HubDesk model={model} /> : null}

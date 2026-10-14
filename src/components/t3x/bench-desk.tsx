@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Gauge } from "lucide-react";
 import { formatMbps, formatMs } from "@/lib/net/format";
 import { pushBench, readBenchHistory, subscribeMemory } from "@/lib/net/memory";
-import { leoNote, runBench } from "@/lib/net/speed";
+import { benchNotes, leoNote, runBench } from "@/lib/net/speed";
 import type { BenchResult } from "@/lib/net/types";
 import type { LinkModel } from "@/components/t3x/use-link";
 
@@ -12,6 +12,7 @@ export function BenchDesk({ model }: { model: LinkModel }) {
   const [live, setLive] = useState<number[]>([]);
   const [current, setCurrent] = useState<BenchResult | null>(null);
   const [history, setHistory] = useState<BenchResult[]>([]);
+  const [stage, setStage] = useState("");
 
   useEffect(() => {
     const sync = () => setHistory(readBenchHistory());
@@ -24,10 +25,15 @@ export function BenchDesk({ model }: { model: LinkModel }) {
     setRunning(true);
     setError("");
     setLive([]);
+    setStage("Idle ping");
     try {
-      const result = await runBench((mbps) => {
-        setLive((prev) => [...prev, mbps].slice(-40));
-      }, controller.signal);
+      const result = await runBench(
+        (mbps) => {
+          setLive((prev) => [...prev, mbps].slice(-40));
+        },
+        controller.signal,
+        setStage,
+      );
       setCurrent(result);
       pushBench(result);
     } catch (reason) {
@@ -36,6 +42,7 @@ export function BenchDesk({ model }: { model: LinkModel }) {
       }
     } finally {
       setRunning(false);
+      setStage("");
     }
   }
 
@@ -49,33 +56,52 @@ export function BenchDesk({ model }: { model: LinkModel }) {
         <p className="kicker">Bench</p>
         <h2 className="mt-2 text-2xl font-semibold">Measure the path you are on</h2>
         <p className="mt-2 max-w-2xl text-base text-fg">
-          A short test against Cloudflare. About 8 MB down and 1.5 MB up. The browser’s own
-          “downlink” number is only a hint — this is the measurement.
+          Six checks against Cloudflare: idle ping, time to first byte, one download, ping while that download runs, three downloads at once, then an upload. About 17 MB down and 2 MB up.
         </p>
-        <button type="button" className="btn btn-primary mt-4" onClick={() => void start()} disabled={running || model.link?.online === false}>
+        <button type="button" className="btn btn-primary mt-4 w-full text-lg" onClick={() => void start()} disabled={running || model.link?.online === false}>
           <Gauge aria-hidden="true" size={16} />
-          {running ? "Running…" : "Start bench"}
+          {running ? stage || "Running…" : "Start bench"}
         </button>
-        {error ? <p className="mt-3 text-sm text-mark">{error}</p> : null}
+        {error ? <p className="mt-3 text-base text-mark">{error}</p> : null}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3">
         <article className="card">
-          <p className="stat-label">Ping</p>
+          <p className="stat-label">Idle ping</p>
           <p className="stat-value mt-2">{formatMs(shown?.pingMs ?? null)}</p>
           <p className="mt-1 text-base text-fg">Jitter {formatMs(shown?.jitterMs ?? null)}</p>
         </article>
         <article className="card">
+          <p className="stat-label">Loaded ping</p>
+          <p className="stat-value mt-2">{formatMs(shown?.loadedPingMs ?? null)}</p>
+          <p className="mt-1 text-base text-fg">While the download runs</p>
+        </article>
+        <article className="card">
+          <p className="stat-label">First byte</p>
+          <p className="stat-value mt-2">{formatMs(shown?.ttfbMs ?? null)}</p>
+          <p className="mt-1 text-base text-fg">Until the download answers</p>
+        </article>
+        <article className="card">
           <p className="stat-label">Download</p>
           <p className="stat-value mt-2">{formatMbps(shown?.downMbps ?? (live.at(-1) ?? null))}</p>
+          <p className="mt-1 text-base text-fg">One connection</p>
+        </article>
+        <article className="card">
+          <p className="stat-label">Three at once</p>
+          <p className="stat-value mt-2">{formatMbps(shown?.parallelMbps ?? null)}</p>
+          <p className="mt-1 text-base text-fg">Parallel download</p>
         </article>
         <article className="card">
           <p className="stat-label">Upload</p>
           <p className="stat-value mt-2">{formatMbps(shown?.upMbps ?? null)}</p>
+          <p className="mt-1 text-base text-fg">One connection</p>
         </article>
       </section>
 
       {note ? <p className="text-base text-fg">{note}</p> : null}
+      {shown ? benchNotes(shown).map((line) => (
+        <p key={line} className="text-base text-fg">{line}</p>
+      )) : null}
 
       {live.length > 1 ? (
         <div className="card">
@@ -97,10 +123,15 @@ export function BenchDesk({ model }: { model: LinkModel }) {
           <p className="kicker">On this device</p>
           <ul className="mt-3 grid gap-2">
             {history.map((row) => (
-              <li key={row.at} className="flex flex-wrap justify-between gap-2 text-sm">
-                <span className="tabular-nums text-muted">{new Date(row.at).toLocaleString()}</span>
+              <li key={row.at} className="grid gap-1 text-base">
+                <span className="tabular-nums text-fg">{new Date(row.at).toLocaleString()}</span>
                 <span className="tabular-nums">
-                  {formatMs(row.pingMs)} · {formatMbps(row.downMbps)} down
+                  {formatMs(row.pingMs)} idle
+                  {row.loadedPingMs != null ? ` · ${formatMs(row.loadedPingMs)} loaded` : ""}
+                  {row.ttfbMs != null ? ` · ${formatMs(row.ttfbMs)} first byte` : ""}
+                  {" · "}
+                  {formatMbps(row.downMbps)} down
+                  {row.parallelMbps != null ? ` · ${formatMbps(row.parallelMbps)} ×3` : ""}
                   {row.upMbps != null ? ` · ${formatMbps(row.upMbps)} up` : ""}
                 </span>
               </li>

@@ -35,6 +35,10 @@ export type BenchResult = {
   downMbps: number;
   upMbps: number | null;
   samples: number[];
+  loadedPingMs?: number | null;
+  ttfbMs?: number | null;
+  parallelMbps?: number | null;
+  missed?: number;
 };
 
 export type HotspotKind = "library" | "cafe" | "cowork" | "community" | "wifi" | "place";

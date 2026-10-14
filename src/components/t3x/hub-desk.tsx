@@ -25,6 +25,7 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const [liveUp, setLiveUp] = useState<number | null>(null);
   const [downTrail, setDownTrail] = useState<number[]>([]);
   const [upTrail, setUpTrail] = useState<number[]>([]);
+  const [logPage, setLogPage] = useState(0);
 
   useEffect(() => {
     const sync = () => {
@@ -233,15 +234,33 @@ export function HubDesk({ model }: { model: LinkModel }) {
       </section>
 
       {journal.length > 0 ? (
-        <section className="card">
+        <section className="card grid gap-3">
           <p className="kicker">Log</p>
-          <ul className="mt-3 grid gap-2">
-            {journal.slice(0, 6).map((entry) => (
+          <ul className="grid gap-2">
+            {journal.slice(logPage * 5, logPage * 5 + 5).map((entry) => (
               <li key={entry.id} className="text-base text-fg">
                 {entry.summary.replaceAll("Hidden", "Online")}
               </li>
             ))}
           </ul>
+          {journal.length > 5 ? (
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" className="btn btn-ghost" disabled={logPage === 0} onClick={() => setLogPage((page) => Math.max(0, page - 1))}>
+                Newer
+              </button>
+              <p className="text-base text-fg">
+                {logPage + 1} / {Math.ceil(journal.length / 5)}
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={(logPage + 1) * 5 >= journal.length}
+                onClick={() => setLogPage((page) => page + 1)}
+              >
+                Older
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>

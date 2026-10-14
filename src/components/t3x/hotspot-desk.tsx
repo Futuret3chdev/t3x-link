@@ -72,6 +72,7 @@ export function HotspotDesk({
   const [look, setLook] = useState<{ lat: number; lon: number; zoom: number } | null>(null);
   const [pin, setPin] = useState(0);
   const [pickedId, setPickedId] = useState("");
+  const [spotPage, setSpotPage] = useState(0);
 
   const visible = useMemo(() => {
     return spots
@@ -85,8 +86,14 @@ export function HotspotDesk({
   }, [filter, spots]);
 
   const dots = useMemo(() => markers(center, visible), [center, visible]);
+  const spotPages = Math.max(1, Math.ceil(visible.length / 4));
+  const spotSafe = Math.min(spotPage, spotPages - 1);
   const nearestOpen = visible.find((spot) => spot.free && spot.ssid);
   const picked = visible.find((spot) => spot.id === pickedId) || null;
+
+  useEffect(() => {
+    setSpotPage(0);
+  }, [filter, spots]);
 
   function showOnMap(spot: Hotspot) {
     setLook({ lat: spot.lat, lon: spot.lon, zoom: 16 });
@@ -366,7 +373,7 @@ export function HotspotDesk({
           ) : null}
 
           <ul className="grid gap-3">
-            {visible.map((spot) => (
+            {visible.slice(spotSafe * 4, spotSafe * 4 + 4).map((spot) => (
               <li key={spot.id} className="card">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -406,6 +413,19 @@ export function HotspotDesk({
               </li>
             ))}
           </ul>
+          {visible.length > 4 ? (
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" className="btn btn-ghost" disabled={spotSafe === 0} onClick={() => setSpotPage((page) => Math.max(0, page - 1))}>
+                Back
+              </button>
+              <p className="text-base text-fg">
+                {spotSafe + 1} / {spotPages}
+              </p>
+              <button type="button" className="btn btn-ghost" disabled={spotSafe + 1 >= spotPages} onClick={() => setSpotPage((page) => page + 1)}>
+                Next
+              </button>
+            </div>
+          ) : null}
         </div>
         <div id="place-map" className="order-1 grid gap-2 lg:sticky lg:top-4 lg:order-2">
           <div className="tab-wrap">

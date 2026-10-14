@@ -28,6 +28,7 @@ function When({ at }: { at: number }) {
 export function FieldDesk() {
   const [notes, setNotes] = useState<FieldNote[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
+  const [logPage, setLogPage] = useState(0);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<FieldKind>("wifi");
   const [free, setFree] = useState(false);
@@ -219,12 +220,12 @@ export function FieldDesk() {
           ) : null}
         </section>
 
-        <section className="card">
+        <section className="card grid gap-3">
           <p className="kicker">Link journal</p>
-          <ul className="mt-3 grid gap-2">
+          <ul className="grid gap-2">
             {journal.length === 0 ? <li className="text-base text-fg">Changes to this link will show up here.</li> : null}
-            {journal.map((entry) => (
-              <li key={entry.id} className="flex flex-wrap justify-between gap-2 text-sm">
+            {journal.slice(logPage * 5, logPage * 5 + 5).map((entry) => (
+              <li key={entry.id} className="flex flex-wrap justify-between gap-2 text-base">
                 <span>{entry.summary}</span>
                 <span className="text-muted">
                   <When at={entry.at} />
@@ -232,6 +233,24 @@ export function FieldDesk() {
               </li>
             ))}
           </ul>
+          {journal.length > 5 ? (
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" className="btn btn-ghost" disabled={logPage === 0} onClick={() => setLogPage((page) => Math.max(0, page - 1))}>
+                Newer
+              </button>
+              <p className="text-base text-fg">
+                {logPage + 1} / {Math.ceil(journal.length / 5)}
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={(logPage + 1) * 5 >= journal.length}
+                onClick={() => setLogPage((page) => page + 1)}
+              >
+                Older
+              </button>
+            </div>
+          ) : null}
         </section>
       </div>
     </div>

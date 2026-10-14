@@ -20,14 +20,16 @@ const LAYERS: { id: CatalogGroup; color: string; big?: boolean }[] = [
 type FleetDot = { name: string; lat: number; lon: number; altKm: number; color: string; big: boolean };
 type Row = { sat: PreparedSat; color: string; big: boolean };
 
-function project(lat: number, lon: number, rot: number) {
+function project(lat: number, lon: number, rot: number, tilt: number) {
   const phi = (lat * Math.PI) / 180;
   const lambda = ((lon - rot) * Math.PI) / 180;
-  return {
-    x: Math.cos(phi) * Math.sin(lambda),
-    y: Math.sin(phi),
-    z: Math.cos(phi) * Math.cos(lambda),
-  };
+  const x = Math.cos(phi) * Math.sin(lambda);
+  const y = Math.sin(phi);
+  const z = Math.cos(phi) * Math.cos(lambda);
+  const turn = (tilt * Math.PI) / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  return { x, y: y * cos - z * sin, z: y * sin + z * cos };
 }
 
 function place(rows: Row[], date: Date): FleetDot[] {
@@ -46,10 +48,11 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
   const rows = useRef<Row[]>([]);
   const [dots, setDots] = useState<FleetDot[]>([]);
   const [rot, setRot] = useState(145);
+  const [tilt, setTilt] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [picked, setPicked] = useState<FleetDot | null>(null);
   const [note, setNote] = useState("Reading orbits…");
-  const drag = useRef<{ x: number; rot: number; moved: boolean } | null>(null);
+  const drag = useRef<{ x: number; y: number; rot: number; tilt: number; moved: boolean } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef(0);
 
@@ -115,8 +118,8 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
       for (let index = 0; index < ring.length; index += 1) {
         const here = ring[index];
         const next = ring[(index + 1) % ring.length];
-        const a = project(here[1], here[0], rot);
-        const b = project(next[1], next[0], rot);
+        const a = project(here[1], here[0], rot, tilt);
+        const b = project(next[1], next[0], rot, tilt);
         if (a.z > 0) pts.push(a);
         if ((a.z > 0) !== (b.z > 0)) {
           const t = a.z / (a.z - b.z);
@@ -138,7 +141,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
     ctx.restore();
     const front = dots
       .map((dot) => {
-        const point = project(dot.lat, dot.lon, rot);
+        const point = project(dot.lat, dot.lon, rot, tilt);
         const lift = 1 + Math.min(Math.max(dot.altKm, 0), 2000) / 9000;
         return { dot, point, lift };
       })
@@ -153,7 +156,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
       ctx.fill();
     }
     if (observer) {
-      const you = project(observer.lat, observer.lon, rot);
+      const you = project(observer.lat, observer.lon, rot, tilt);
       if (you.z > 0.02) {
         ctx.beginPath();
         ctx.fillStyle = "#ff4d4d";
@@ -169,7 +172,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
     ctx.lineWidth = 1.5;
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
-  }, [dots, observer, rot, zoom]);
+  }, [dots, observer, rot, tilt, zoom]);
 
   function pickAt(clientX: number, clientY: number) {
     const frame = box.current;
@@ -181,7 +184,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
     let best: FleetDot | null = null;
     let bestD = 22;
     for (const dot of dots) {
-      const point = project(dot.lat, dot.lon, rot);
+      const point = project(dot.lat, dot.lon, rot, tilt);
       if (point.z <= 0.02) continue;
       const lift = 1 + Math.min(Math.max(dot.altKm, 0), 2000) / 9000;
       const x = cx + point.x * radius * lift;
@@ -205,7 +208,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
           pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
           const pair = [...pointers.current.values()];
           pinch.current = pair.length >= 2 ? Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y) : 0;
-          drag.current = { x: event.clientX, rot, moved: false };
+          drag.current = { x: event.clientX, y: event.clientY, rot, tilt, moved: false };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
@@ -224,8 +227,10 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
           }
           if (!drag.current) return;
           const dx = event.clientX - drag.current.x;
-          if (Math.abs(dx) > 6) drag.current.moved = true;
-          setRot(drag.current.rot + dx * 0.45);
+          const dy = event.clientY - drag.current.y;
+          if (Math.hypot(dx, dy) > 6) drag.current.moved = true;
+          setRot(drag.current.rot + dx * 0.4);
+          setTilt(Math.max(-75, Math.min(75, drag.current.tilt - dy * 0.35)));
         }}
         onPointerUp={(event) => {
           pointers.current.delete(event.pointerId);
@@ -248,7 +253,7 @@ export function FleetGlobe({ observer }: { observer: { lat: number; lon: number 
           </button>
         </div>
       </div>
-      <p className="text-base text-fg">{note || `${dots.length.toLocaleString()} satellites. Drag to turn. Pinch or use + to zoom.`}</p>
+      <p className="text-base text-fg">{note || `${dots.length.toLocaleString()} satellites. Drag any way to turn it. Pinch or use + to zoom.`}</p>
       {picked ? (
         <article className="card grid gap-1">
           <p className="text-lg font-semibold">{picked.name}</p>

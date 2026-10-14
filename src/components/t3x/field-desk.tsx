@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { wifiUri } from "@/lib/net/format";
 import { readJournal, readNotes, removeNote, saveNote, subscribeMemory } from "@/lib/net/memory";
 import type { FieldKind, FieldNote, JournalEntry } from "@/lib/net/types";
+import { joinOpenWifi } from "@/lib/net/wifi-join";
 
 const KINDS: { id: FieldKind; label: string }[] = [
   { id: "wifi", label: "Wi-Fi" },
@@ -37,6 +38,7 @@ export function FieldDesk() {
   const [hidden, setHidden] = useState(false);
   const [qr, setQr] = useState("");
   const [shareError, setShareError] = useState("");
+  const [joinNote, setJoinNote] = useState("");
 
   useEffect(() => {
     const sync = () => {
@@ -191,8 +193,27 @@ export function FieldDesk() {
             <button type="submit" className="btn btn-accent" disabled={!ssid.trim()}>
               Make join code
             </button>
+            {security === "nopass" ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!ssid.trim()}
+                onClick={() => {
+                  setShareError("");
+                  setJoinNote("");
+                  void joinOpenWifi(ssid).then(
+                    (note) => setJoinNote(note),
+                    (reason: unknown) =>
+                      setShareError(reason instanceof Error ? reason.message : "Could not start the join."),
+                  );
+                }}
+              >
+                Connect this phone
+              </button>
+            ) : null}
           </form>
-          {shareError ? <p className="mt-3 text-sm text-mark">{shareError}</p> : null}
+          {shareError ? <p className="mt-3 text-base text-mark">{shareError}</p> : null}
+          {joinNote ? <p className="mt-3 text-base text-fg">{joinNote}</p> : null}
           {qr ? (
             <img src={qr} alt="Wi-Fi join code" className="mx-auto mt-4 w-full max-w-56 rounded-xl bg-fg p-2" />
           ) : null}

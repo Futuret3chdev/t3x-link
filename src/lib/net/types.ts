@@ -52,6 +52,7 @@ export type Hotspot = {
   address: string;
   website: string | null;
   distanceM: number;
+  ssid: string;
 };
 
 export type PlaceHit = {

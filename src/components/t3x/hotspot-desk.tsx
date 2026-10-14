@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Bluetooth, ExternalLink, LocateFixed, MapPin, Search } from "lucide-react";
+import { Bluetooth, ExternalLink, LocateFixed, MapPin, Search, Wifi } from "lucide-react";
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { formatDistance } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
 import { pickBluetooth } from "@/lib/net/phone";
 import { geocodePlace, searchHotspots } from "@/lib/net/places";
 import type { FieldKind, Hotspot } from "@/lib/net/types";
+import { joinOpenWifi } from "@/lib/net/wifi-join";
 import type { LinkModel } from "@/components/t3x/use-link";
 
 const CITIES = [
@@ -49,6 +50,7 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
   const [error, setError] = useState("");
   const [savedId, setSavedId] = useState("");
   const [bleName, setBleName] = useState("");
+  const [joinNote, setJoinNote] = useState("");
 
   const visible = useMemo(() => {
     return spots.filter((spot) => {
@@ -60,6 +62,17 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
   }, [filter, spots]);
 
   const dots = useMemo(() => markers(center, visible), [center, visible]);
+  const nearestOpen = visible.find((spot) => spot.free && spot.ssid);
+
+  async function connect(spot: Hotspot) {
+    setJoinNote("");
+    setError("");
+    try {
+      setJoinNote(await joinOpenWifi(spot.ssid));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not start the join.");
+    }
+  }
 
   async function scan(lat: number, lon: number, label: string, nextRadius = radius) {
     setCenter({ lat, lon, label });
@@ -146,7 +159,7 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
         <p className="kicker">Public hotspots</p>
         <h2 className="mt-2 text-2xl font-semibold">Mapped places with a reason to have internet</h2>
         <p className="mt-2 text-base text-fg">
-          A phone cannot list nearby Wi-Fi names. This finds mapped libraries, cafés, coworking, and places tagged with internet, around you.
+          A phone cannot list nearby Wi-Fi names. Detect nearby finds mapped places. Connect only appears when the map published an open network name.
         </p>
         <button type="button" className="btn btn-primary mt-4 w-full" onClick={() => locate(800)} disabled={busy !== null}>
           <LocateFixed aria-hidden="true" size={16} />
@@ -234,6 +247,13 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
           </div>
 
           {error ? <p className="text-base text-mark">{error}</p> : null}
+          {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
+          {nearestOpen ? (
+            <button type="button" className="btn btn-primary w-full" onClick={() => void connect(nearestOpen)}>
+              <Wifi aria-hidden="true" size={16} />
+              Connect {nearestOpen.ssid}
+            </button>
+          ) : null}
           {busy === "scan" ? <p className="text-base text-fg">Searching mapped places…</p> : null}
           {center && !busy && !error && visible.length === 0 ? (
             <p className="text-base text-fg">
@@ -250,6 +270,7 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
                     <p className="mt-1 text-base text-fg">
                       {spot.kindLabel}
                       {spot.free ? " · Tagged free" : ""}
+                      {spot.ssid ? ` · ${spot.ssid}` : ""}
                       {spot.access ? ` · ${spot.access}` : ""}
                       {" · "}
                       {formatDistance(spot.distanceM)}
@@ -258,6 +279,12 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
                     {spot.hours ? <p className="mt-1 text-base text-fg">{spot.hours}</p> : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {spot.free && spot.ssid ? (
+                      <button type="button" className="btn btn-primary" onClick={() => void connect(spot)}>
+                        <Wifi aria-hidden="true" size={16} />
+                        Connect
+                      </button>
+                    ) : null}
                     <a
                       className="btn btn-ghost"
                       href={`https://www.openstreetmap.org/?mlat=${spot.lat}&mlon=${spot.lon}#map=18/${spot.lat}/${spot.lon}`}

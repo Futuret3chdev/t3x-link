@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { haversine } from "@/lib/net/format";
+import { cleanSsid } from "@/lib/net/wifi-profile";
 import type { Hotspot, PlaceHit } from "@/lib/net/types";
 
 const UA = "T3xLink/1.0 (Futuret3ch; https://github.com/Futuret3chdev/t3x-link)";
@@ -119,6 +120,7 @@ export const searchHotspots = createServerFn({ method: "POST" })
           address,
           website: httpUrl(tags.website || tags["contact:website"]),
           distanceM,
+          ssid: cleanSsid(tags["internet_access:ssid"] || tags.ssid || "") || "",
         });
       }
     }

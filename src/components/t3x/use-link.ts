@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readIdentity } from "@/lib/net/identity";
 import { linkSignature, readLink, watchLink } from "@/lib/net/link";
-import { pushJournal } from "@/lib/net/memory";
+import { pushJournal, pushPing } from "@/lib/net/memory";
 import { readPhone, samplePath, type PathSample, type PhoneFacts } from "@/lib/net/phone";
 import type { LinkReading, NatReport, NetIdentity } from "@/lib/net/types";
 import { probeNat } from "@/lib/net/webrtc";
@@ -38,7 +38,10 @@ export function useLink(): LinkModel {
     setLink(readLink());
     samplePath(controller.signal)
       .then((sample) => {
-        if (!controller.signal.aborted) setPath(sample);
+        if (!controller.signal.aborted) {
+          setPath(sample);
+          pushPing(sample.pingMs);
+        }
       })
       .catch(() => {
         /* identity error is the one we surface */

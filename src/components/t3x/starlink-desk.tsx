@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Compass, Copy, LocateFixed, Navigation } from "lucide-react";
+import { Compass, Copy, LocateFixed, Navigation, SunMedium } from "lucide-react";
 import { useConstellation } from "@/components/t3x/use-constellation";
-import { readBenchHistory, readSky, subscribeMemory, writeSky } from "@/lib/net/memory";
+import { readBenchHistory, readSky, saveNote, subscribeMemory, writeSky } from "@/lib/net/memory";
 import { leoNote } from "@/lib/net/speed";
 import type { Observer, SkyDot } from "@/lib/net/propagate";
 import type { LinkModel } from "@/components/t3x/use-link";
@@ -64,6 +64,9 @@ export function StarlinkDesk({ model }: { model: LinkModel }) {
   const [facing, setFacing] = useState(false);
   const [heading, setHeading] = useState<number | null>(null);
   const [compassNote, setCompassNote] = useState("");
+  const [held, setHeld] = useState(false);
+  const [savedSky, setSavedSky] = useState(false);
+  const wake = useRef<WakeLockSentinel | null>(null);
   const [placeNote, setPlaceNote] = useState("");
   const picked = useRef(false);
   const headingRef = useRef<number | null>(null);
@@ -197,6 +200,38 @@ export function StarlinkDesk({ model }: { model: LinkModel }) {
     }
   }
 
+  async function toggleScreen() {
+    try {
+      if (wake.current) {
+        await wake.current.release();
+        wake.current = null;
+        setHeld(false);
+        return;
+      }
+      if (!("wakeLock" in navigator)) {
+        setCompassNote("This phone will not keep the screen awake.");
+        return;
+      }
+      wake.current = await navigator.wakeLock.request("screen");
+      setHeld(true);
+      wake.current.addEventListener("release", () => setHeld(false));
+    } catch {
+      setCompassNote("The screen lock was refused.");
+    }
+  }
+
+  function saveSkyNote() {
+    saveNote({
+      id: crypto.randomUUID(),
+      at: Date.now(),
+      name: placeLabel || "Sky check",
+      kind: "starlink",
+      free: false,
+      detail: `${score}% clear${highest ? ` · ${highest.name} at ${Math.round(highest.el)}°` : ""}`,
+    });
+    setSavedSky(true);
+  }
+
   const cells = [];
   for (let band = 0; band < BANDS; band += 1) {
     for (let sector = 0; sector < SECTORS; sector += 1) {
@@ -306,6 +341,13 @@ export function StarlinkDesk({ model }: { model: LinkModel }) {
                 Follow the phone
               </button>
             )}
+            <button type="button" className="btn btn-ghost" onClick={toggleScreen}>
+              <SunMedium aria-hidden="true" size={16} />
+              {held ? "Screen stays on" : "Keep screen on"}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={saveSkyNote}>
+              {savedSky ? "Sky saved" : "Save this sky"}
+            </button>
             <a className="btn btn-primary" href="https://www.starlink.com/map" target="_blank" rel="noreferrer">
               Check address on Starlink
             </a>

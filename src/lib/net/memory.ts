@@ -4,6 +4,9 @@ const NOTES = "t3x-link-notes";
 const JOURNAL = "t3x-link-journal";
 const BENCH = "t3x-link-bench";
 const SKY = "t3x-link-sky";
+const PINGS = "t3x-link-pings";
+
+export type PingMark = { at: number; pingMs: number };
 
 const listeners = new Set<() => void>();
 let lastSummary = "";
@@ -76,4 +79,18 @@ export function readSky(): string {
 
 export function writeSky(mask: string) {
   write(SKY, mask);
+}
+
+export function readPings(): PingMark[] {
+  const rows = read<PingMark[]>(PINGS, []);
+  return Array.isArray(rows) ? rows.filter((row) => Number.isFinite(row.pingMs)) : [];
+}
+
+export function pushPing(pingMs: number) {
+  if (!Number.isFinite(pingMs) || pingMs <= 0) return;
+  const now = Date.now();
+  const rows = readPings().filter((row) => now - row.at < 30 * 60 * 1000);
+  const last = rows[rows.length - 1];
+  if (last && now - last.at < 8000) return;
+  write(PINGS, [...rows, { at: now, pingMs: Math.round(pingMs) }].slice(-12));
 }

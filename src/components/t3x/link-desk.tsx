@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { formatMbps, formatMs } from "@/lib/net/format";
+import { readPings, subscribeMemory, type PingMark } from "@/lib/net/memory";
 import type { LinkModel } from "@/components/t3x/use-link";
 
 function placeLine(model: LinkModel): string {
@@ -11,8 +12,15 @@ function placeLine(model: LinkModel): string {
 
 export function LinkDesk({ model }: { model: LinkModel }) {
   const [copied, setCopied] = useState(false);
+  const [pings, setPings] = useState<PingMark[]>([]);
   const { link, identity, nat, path, phone, reading, error, zone } = model;
   const place = placeLine(model);
+
+  useEffect(() => {
+    const sync = () => setPings(readPings());
+    sync();
+    return subscribeMemory(sync);
+  }, []);
 
   const verdict = !link
     ? "Reading this network…"
@@ -98,6 +106,30 @@ export function LinkDesk({ model }: { model: LinkModel }) {
           </p>
         </article>
       </section>
+
+      {pings.length > 0 ? (
+        <section className="card">
+          <p className="kicker">Ping trail</p>
+          <p className="mt-2 text-base text-fg">The last few measurements on this phone. Taller is slower.</p>
+          <div className="mt-3 flex h-16 items-end gap-1" aria-hidden="true">
+            {pings.map((mark) => {
+              const peak = Math.max(...pings.map((row) => row.pingMs), 1);
+              return (
+                <span
+                  key={mark.at}
+                  className="flex-1 rounded-sm bg-primary"
+                  style={{ height: `${Math.max(12, Math.round((mark.pingMs / peak) * 100))}%` }}
+                  title={`${mark.pingMs} ms`}
+                />
+              );
+            })}
+          </div>
+          <p className="mt-2 text-base text-fg">
+            Latest {formatMs(pings[pings.length - 1]?.pingMs ?? null)}
+            {pings.length > 1 ? ` · first ${formatMs(pings[0]?.pingMs ?? null)}` : ""}
+          </p>
+        </section>
+      ) : null}
 
       <section className="grid gap-3 lg:grid-cols-2">
         <article className="card">

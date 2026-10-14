@@ -30,6 +30,51 @@ function minutes(start: number, end: number): number {
   return Math.max(1, Math.round((end - start) / 60_000));
 }
 
+function plotPoint(az: number, el: number): [number, number] {
+  const radius = ((90 - Math.max(0, Math.min(90, el))) / 90) * 78;
+  const theta = (az * Math.PI) / 180;
+  return [100 + radius * Math.sin(theta), 100 - radius * Math.cos(theta)];
+}
+
+function SkyPlot({ sky, onPick }: { sky: SkyDot[]; onPick: (name: string) => void }) {
+  return (
+    <svg viewBox="0 0 200 200" className="sky-plot" role="img" aria-label="Sky chart">
+      <circle cx="100" cy="100" r="78" className="sky-ring" />
+      <circle cx="100" cy="100" r="52" className="sky-ring" />
+      <circle cx="100" cy="100" r="26" className="sky-ring" />
+      <line x1="100" y1="22" x2="100" y2="178" className="sky-ring" />
+      <line x1="22" y1="100" x2="178" y2="100" className="sky-ring" />
+      <text x="100" y="14" textAnchor="middle" className="sky-letter">
+        N
+      </text>
+      <text x="190" y="104" textAnchor="middle" className="sky-letter">
+        E
+      </text>
+      <text x="100" y="196" textAnchor="middle" className="sky-letter">
+        S
+      </text>
+      <text x="10" y="104" textAnchor="middle" className="sky-letter">
+        W
+      </text>
+      {sky.slice(0, 48).map((row) => {
+        const [x, y] = plotPoint(row.az, row.el);
+        return (
+          <circle
+            key={row.name}
+            cx={x}
+            cy={y}
+            r={row.el > 45 ? 3.4 : 2.3}
+            className={row.el > 45 ? "sky-dot-hot" : "sky-dot"}
+            onClick={() => onPick(row.name)}
+          >
+            <title>{`${row.name} ${Math.round(row.el)}°`}</title>
+          </circle>
+        );
+      })}
+    </svg>
+  );
+}
+
 function remaining(at: number, now: number): string {
   const ms = at - now;
   if (ms <= 0) return "Launched";
@@ -221,17 +266,18 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
           {launchError ? <p className="text-base text-mark">{launchError}</p> : null}
           {!launchError && launches.length === 0 ? <p className="text-base text-fg">Reading the launch list…</p> : null}
           {nextUp ? (
-            <div className="grid gap-1">
-              <p className="text-lg font-semibold">{nextUp.name}</p>
+            <article className="launch-hero">
+              <p className="kicker">{nextUp.status}</p>
               <p className="stat-value">{remaining(nextUp.at, now)}</p>
+              <p className="text-lg font-semibold">{nextUp.name}</p>
               <p className="text-base text-fg">
-                {clock(nextUp.at)} · {nextUp.status}
+                {new Date(nextUp.at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 {nextUp.rocket ? ` · ${nextUp.rocket}` : ""}
               </p>
               {nextUp.provider ? <p className="text-base text-fg">{nextUp.provider}</p> : null}
               {nextUp.pad ? <p className="text-base text-fg">{nextUp.pad}</p> : null}
               {nextUp.mission ? <p className="text-base text-fg">{nextUp.mission.slice(0, 220)}</p> : null}
-            </div>
+            </article>
           ) : null}
           <ul className="grid gap-3">
             {launches
@@ -262,9 +308,10 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
           </div>
           {mode === "up" ? (
             <>
+              <SkyPlot sky={sky} onPick={choose} />
               <input className="field" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a name" autoComplete="off" />
-              <button type="button" className="btn btn-primary w-full text-lg" onClick={() => void openSky()} disabled={sky.length === 0}>
-                Point at the sky
+              <button type="button" className="btn btn-accent w-full text-lg" onClick={() => void openSky()} disabled={sky.length === 0}>
+                AR
               </button>
             </>
           ) : null}
@@ -275,13 +322,15 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
               {passBusy ? <p className="text-base text-fg">Finding passes…</p> : null}
               {prepared.length > 200 ? <p className="text-base text-fg">The 40 highest in this group.</p> : null}
               {passes.map((row) => (
-                <p key={`${row.name}-${row.start}`} className="text-base text-fg">
-                  <span className="font-semibold text-fg">{row.name}</span>
-                  {" · "}
-                  {row.start <= Date.now() + 60_000 ? "Up now" : clock(row.start)}
-                  {" · "}
-                  {minutes(row.start, row.end)} min · {Math.round(row.maxEl)}° {compass(row.riseAz)}
-                </p>
+                <article key={`${row.name}-${row.start}`} className="pass-card">
+                  <p className="stat-value">{row.start <= Date.now() + 60_000 ? "Up" : clock(row.start)}</p>
+                  <div>
+                    <p className="text-lg font-semibold">{row.name}</p>
+                    <p className="text-base text-fg">
+                      {minutes(row.start, row.end)} min · {Math.round(row.maxEl)}° · {compass(row.riseAz)}
+                    </p>
+                  </div>
+                </article>
               ))}
               {!passBusy && passes.length === 0 ? <p className="text-base text-fg">No pass above 10° in this window.</p> : null}
             </div>

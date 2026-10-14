@@ -59,14 +59,13 @@ export function SkyView({ sky, onClose }: { sky: SkyDot[]; onClose: () => void }
     .slice(0, 8);
 
   return (
-    <div className="intro" role="dialog" aria-modal="true" aria-label="Sky">
+    <div className="intro" role="dialog" aria-modal="true" aria-label="AR sky">
       <video ref={video} className="intro-video" playsInline muted autoPlay />
+      <div className="sky-cross" aria-hidden="true" />
+      <p className="sky-head">{Math.round(heading)}°</p>
       {spots.map(({ row, rel, relEl }) => (
-        <div
-          key={row.name}
-          className="sky-tag"
-          style={{ left: `${50 + (rel / 48) * 42}%`, top: `${50 - (relEl / 38) * 42}%` }}
-        >
+        <div key={row.name} className="sky-tag" style={{ left: `${50 + (rel / 48) * 42}%`, top: `${50 - (relEl / 38) * 42}%` }}>
+          <span className="sky-pip" />
           <p className="font-semibold">{row.name}</p>
           <p>
             {Math.round(row.el)}° · {Math.round(row.rangeKm)} km
@@ -77,8 +76,8 @@ export function SkyView({ sky, onClose }: { sky: SkyDot[]; onClose: () => void }
         Close
       </button>
       <p className="sky-readout">
-        {Math.round(heading)}° · looking {Math.round(lookEl)}° up
-        {note ? ` · ${note}` : ""}
+        Heading {Math.round(heading)}° · tilt {Math.round(lookEl)}° · {spots.length} in view
+        {note ? ` · ${note}` : " · Move the phone in a figure-8 once if the compass feels off."}
       </p>
     </div>
   );

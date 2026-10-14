@@ -294,6 +294,80 @@
     font-weight: 600;
   }
 
+  .sky-plot {
+    width: min(100%, 22rem);
+    margin-inline: auto;
+    display: block;
+  }
+
+  .sky-ring {
+    fill: none;
+    stroke: #2f7bff;
+    stroke-opacity: 0.45;
+  }
+
+  .sky-letter {
+    fill: #f4efe6;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .sky-dot {
+    fill: #f4efe6;
+  }
+
+  .sky-dot-hot {
+    fill: #d4b15a;
+  }
+
+  .sky-cross {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    z-index: 2;
+    width: 1.4rem;
+    height: 1.4rem;
+    transform: translate(-50%, -50%);
+    border: 2px solid #d4b15a;
+    border-radius: 999px;
+    box-shadow: 0 0 0 8px color-mix(in srgb, #07080d 35%, transparent);
+  }
+
+  .sky-head {
+    position: absolute;
+    z-index: 2;
+    top: max(0.85rem, env(safe-area-inset-top));
+    left: 0.85rem;
+    color: #f4efe6;
+    font-size: 1.35rem;
+    font-weight: 700;
+  }
+
+  .sky-pip {
+    display: block;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin: 0 auto 0.2rem;
+    border-radius: 999px;
+    background: #d4b15a;
+  }
+
+  .pass-card,
+  .launch-hero {
+    display: grid;
+    gap: 0.2rem;
+    border-radius: 1rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 45%, var(--color-line));
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+    padding: 0.8rem 0.9rem;
+  }
+
+  .pass-card {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
   .scroll-row {
     display: flex;
     gap: 0.5rem;

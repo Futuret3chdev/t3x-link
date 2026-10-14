@@ -391,6 +391,10 @@
     text-align: center;
   }
 
+  .trail-bar {
+    transition: height 0.45s ease;
+  }
+
   .tab-bar {
     position: sticky;
     top: 0;

@@ -82,8 +82,22 @@ export function useLink(): LinkModel {
     probeNat().then((report) => {
       if (!cancel) setNat(report);
     });
+    let timer = 0;
+    const beat = async () => {
+      if (cancel) return;
+      const start = performance.now();
+      try {
+        const res = await fetch(`https://speed.cloudflare.com/__down?bytes=0&r=${Math.random()}`, { cache: "no-store" });
+        if (res.ok) pushPing(performance.now() - start);
+      } catch {
+        /* the next beat tries again */
+      }
+      if (!cancel) timer = window.setTimeout(() => void beat(), 2000);
+    };
+    timer = window.setTimeout(() => void beat(), 1200);
     return () => {
       cancel = true;
+      window.clearTimeout(timer);
       flight.current?.abort();
       stop();
     };

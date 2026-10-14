@@ -101,11 +101,12 @@ export function HubDesk({ model }: { model: LinkModel }) {
       {pings.length > 1 ? (
         <div className="card">
           <p className="stat-label">Ping trail</p>
+          <p className="mt-1 text-lg font-semibold">{Math.round(pings[pings.length - 1].pingMs)} ms</p>
           <div className="mt-3 flex h-20 items-end gap-1" aria-hidden="true">
             {pings.map((mark) => (
               <div
                 key={mark.at}
-                className="min-w-1 flex-1 rounded-sm bg-accent"
+                className="trail-bar min-w-1 flex-1 rounded-sm bg-accent"
                 style={{ height: `${Math.max(8, Math.round((mark.pingMs / peak) * 100))}%` }}
               />
             ))}

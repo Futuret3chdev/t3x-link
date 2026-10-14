@@ -93,8 +93,8 @@ export function pushPing(pingMs: number) {
   const now = Date.now();
   const rows = readPings().filter((row) => now - row.at < 30 * 60 * 1000);
   const last = rows[rows.length - 1];
-  if (last && now - last.at < 8000) return;
-  write(PINGS, [...rows, { at: now, pingMs: Math.round(pingMs) }].slice(-12));
+  if (last && now - last.at < 1500) return;
+  write(PINGS, [...rows, { at: now, pingMs: Math.round(pingMs) }].slice(-30));
 }
 
 export function readNets(): OpenNet[] {

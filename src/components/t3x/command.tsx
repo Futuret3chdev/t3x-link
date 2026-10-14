@@ -5,10 +5,10 @@ import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
 import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
-import { OpenNetDesk } from "@/components/t3x/open-net";
+import { OpenNetDesk, addMyHotspot } from "@/components/t3x/open-net";
 import { StarlinkDesk } from "@/components/t3x/starlink-desk";
 import { useLink } from "@/components/t3x/use-link";
-import { joinOpenWifi } from "@/lib/net/wifi-join";
+import { joinOpenWifi, readHotspotName } from "@/lib/net/wifi-join";
 
 const TABS = [
   { id: "link", label: "Link" },
@@ -71,7 +71,6 @@ export function Command() {
   const [fix, setFix] = useState<ScanFix | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState("");
-  const [network, setNetwork] = useState("");
   const [joinNote, setJoinNote] = useState("");
   const [intro, setIntro] = useState(false);
   const online = model.link?.online !== false;
@@ -120,17 +119,16 @@ export function Command() {
     );
   }
 
-  async function connect() {
-    setJoinNote("");
-    if (!network.trim()) {
-      setJoinNote("Type the open network name, then tap Connect.");
+  function connect() {
+    const note = addMyHotspot(() => undefined);
+    const name = readHotspotName();
+    if (!name) {
+      setJoinNote(note);
       return;
     }
-    try {
-      setJoinNote(await joinOpenWifi(network));
-    } catch (reason) {
+    void joinOpenWifi(name).then(setJoinNote).catch((reason) => {
       setJoinNote(reason instanceof Error ? reason.message : "Could not start the join.");
-    }
+    });
   }
 
   return (
@@ -175,24 +173,13 @@ export function Command() {
           </button>
           {scanNote ? <p className="text-base text-fg">{scanNote}</p> : null}
           {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
-          <label className="grid gap-1 text-base font-semibold" htmlFor="open-network">
-            Open network name
-            <input
-              id="open-network"
-              className="field"
-              value={network}
-              autoComplete="off"
-              placeholder="Type the Wi-Fi name"
-              onChange={(event) => setNetwork(event.target.value)}
-            />
-          </label>
-          <button type="button" className="btn btn-accent w-full text-lg" onClick={() => void connect()}>
+          <button type="button" className="btn btn-accent w-full text-lg" onClick={connect}>
             <Wifi aria-hidden="true" size={18} />
-            Connect
+            Use my hotspot
           </button>
           {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
         </section>
-        <OpenNetDesk onNamed={setNetwork} />
+        <OpenNetDesk onNamed={() => undefined} />
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (
             <button
@@ -215,7 +202,7 @@ export function Command() {
         </div>
         <div role="tabpanel" id="panel-hotspots" aria-labelledby="tab-hotspots" hidden={tab !== "hotspots"}>
           {tab === "hotspots" ? (
-            <HotspotDesk model={model} active fix={fix} onNamed={(ssid) => setNetwork((current) => current || ssid)} />
+            <HotspotDesk model={model} active fix={fix} onNamed={() => undefined} />
           ) : null}
         </div>
         <div role="tabpanel" id="panel-starlink" aria-labelledby="tab-starlink" hidden={tab !== "starlink"}>

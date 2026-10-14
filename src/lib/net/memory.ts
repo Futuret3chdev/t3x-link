@@ -8,7 +8,7 @@ const PINGS = "t3x-link-pings";
 const NETS = "t3x-open-nets";
 
 export type PingMark = { at: number; pingMs: number };
-export type OpenNet = { id: string; at: number; name: string; note: string };
+export type OpenNet = { id: string; at: number; name: string; note: string; known?: boolean };
 
 const listeners = new Set<() => void>();
 let lastSummary = "";

@@ -23,15 +23,20 @@ export async function joinOpenWifi(ssid: string): Promise<string> {
   return "The open-network profile is downloading. Install it on the phone that should join.";
 }
 
-export function openHotspotSettings(name: string): string {
+export function readHotspotName(): string | null {
+  const link = navigator as Navigator & { connection?: { ssid?: string; name?: string } };
+  return cleanSsid(link.connection?.ssid || link.connection?.name || "");
+}
+
+export function openHotspotSettings(): string {
   const android = /Android/i.test(navigator.userAgent);
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   if (android) {
     window.location.assign("intent:#Intent;action=android.settings.TETHER_SETTINGS;end");
-    return `Hotspot settings should open. Set the name to “${name}” and leave the security open.`;
+    return "Hotspot settings should open. The name already there is the one this phone uses.";
   }
   if (ios) {
-    return `On this iPhone open Settings, tap Personal Hotspot, turn it on, and set the name to “${name}”. A website cannot switch the hotspot on.`;
+    return "This iPhone does not share the Personal Hotspot name with a website. The one already in Settings is the one in use.";
   }
-  return `Turn on your hotspot and set the name to “${name}”.`;
+  return "The hotspot already turned on in system settings is the one in use. A website cannot read that name.";
 }

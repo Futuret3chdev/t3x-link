@@ -6,11 +6,13 @@ import { HotspotDesk } from "@/components/t3x/hotspot-desk";
 import { HubDesk } from "@/components/t3x/hub-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
 import { PlanetsDesk } from "@/components/t3x/planets-desk";
+import { StarTools } from "@/components/t3x/star-tools";
 import { useLink } from "@/components/t3x/use-link";
 
 const TABS = [
   { id: "hub", label: "Hub" },
   { id: "planets", label: "Planets" },
+  { id: "startools", label: "Star-tools" },
   { id: "link", label: "Link" },
   { id: "hotspots", label: "Places" },
   { id: "bench", label: "Bench" },
@@ -152,6 +154,9 @@ export function Command() {
         </div>
         <div role="tabpanel" id="panel-planets" aria-labelledby="tab-planets" hidden={tab !== "planets"}>
           {tab === "planets" ? <PlanetsDesk model={model} /> : null}
+        </div>
+        <div role="tabpanel" id="panel-startools" aria-labelledby="tab-startools" hidden={tab !== "startools"}>
+          {tab === "startools" ? <StarTools model={model} /> : null}
         </div>
         <div role="tabpanel" id="panel-bench" aria-labelledby="tab-bench" hidden={tab !== "bench"}>
           {tab === "bench" ? <BenchDesk model={model} /> : null}

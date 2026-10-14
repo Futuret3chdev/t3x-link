@@ -3,7 +3,7 @@ import { Bluetooth, LocateFixed, MapPin, Search, Share2, Wifi } from "lucide-rea
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { FleetGlobe } from "@/components/t3x/fleet-globe";
 import { formatDistance, wifiUri } from "@/lib/net/format";
-import { saveNote, readPlaceName, savePlaceName, markJoin } from "@/lib/net/memory";
+import { saveNote, readPlaceName, savePlaceName, markJoin, readJoin } from "@/lib/net/memory";
 import { pickBluetooth, scanNearbyRadios } from "@/lib/net/phone";
 import { geocodePlace, searchHotspots } from "@/lib/net/places";
 import type { FieldKind, Hotspot } from "@/lib/net/types";
@@ -66,6 +66,7 @@ export function HotspotDesk({
   const [bleName, setBleName] = useState("");
   const [joinNote, setJoinNote] = useState("");
   const [joinQr, setJoinQr] = useState("");
+  const [joinedName, setJoinedName] = useState(() => readJoin()?.name || "");
   const [nearby, setNearby] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [accuracy, setAccuracy] = useState<number | null>(null);
@@ -111,6 +112,7 @@ export function HotspotDesk({
     const name = (spot.ssid || joinName).trim();
     savePlaceName(spot.id, name);
     markJoin(name, null);
+    setJoinedName(name);
     try {
       setJoinNote(await joinOpenWifi(name));
     } catch (reason) {
@@ -539,15 +541,26 @@ export function HotspotDesk({
                     autoComplete="off"
                   />
                 )}
-                <button
-                  type="button"
-                  className="btn btn-primary w-full text-lg"
-                  disabled={!(picked.ssid || joinName).trim()}
-                  onClick={() => void connect(picked)}
-                >
-                  <Wifi aria-hidden="true" size={16} />
-                  Join this phone
-                </button>
+                {(() => {
+                  const onPhone =
+                    model.link?.online !== false &&
+                    Boolean(joinedName) &&
+                    (joinedName === picked.name || joinedName === joinName.trim());
+                  if (onPhone) {
+                    return <p className="text-lg font-semibold">On this phone</p>;
+                  }
+                  return (
+                    <button
+                      type="button"
+                      className="btn btn-primary w-full text-lg"
+                      disabled={!(picked.ssid || joinName).trim()}
+                      onClick={() => void connect(picked)}
+                    >
+                      <Wifi aria-hidden="true" size={16} />
+                      Join this phone
+                    </button>
+                  );
+                })()}
                 <button
                   type="button"
                   className="btn btn-ghost w-full"

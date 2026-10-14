@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatMs } from "@/lib/net/format";
 import { readBenchHistory, readJoin, readJournal, readPings, subscribeMemory, type JoinTry, type PingMark } from "@/lib/net/memory";
-import { DishTool } from "@/components/t3x/dish-tool";
 import { runTool, type ToolKind, type ToolReport } from "@/lib/net/tools";
 import type { BenchResult, JournalEntry } from "@/lib/net/types";
 import type { LinkModel } from "@/components/t3x/use-link";
@@ -269,7 +268,6 @@ export function HubDesk({ model }: { model: LinkModel }) {
             ))}
           </div>
         ) : null}
-        <DishTool ping={pings.at(-1)?.pingMs ?? ping} down={downShown} />
       </section>
 
       {journal.length > 0 ? (

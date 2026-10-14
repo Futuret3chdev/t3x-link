@@ -419,17 +419,13 @@ export function HotspotDesk({
                 setViewMode("globe");
               }}
             >
-              Free wifi
+              Major wifi
             </button>
           </div>
           {viewMode === "globe" ? (
             <>
               <WifiGlobe spots={visible.map((spot) => ({ name: spot.name, lat: spot.lat, lon: spot.lon, free: spot.free }))} />
-              <p className="text-base text-fg">
-                {visible.some((spot) => spot.free)
-                  ? "Gold is tagged free in this scan. Drag to turn the globe."
-                  : "No place in this scan is tagged free. Drag to turn the globe."}
-              </p>
+              <p className="text-base text-fg">Gold is a major wifi city. Blue is a place from this scan. Drag to turn it.</p>
             </>
           ) : (
             <SlippyMap

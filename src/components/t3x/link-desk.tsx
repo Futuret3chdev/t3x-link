@@ -11,7 +11,7 @@ function placeLine(model: LinkModel): string {
 
 export function LinkDesk({ model }: { model: LinkModel }) {
   const [copied, setCopied] = useState(false);
-  const { link, identity, nat, reading, error, zone } = model;
+  const { link, identity, nat, path, phone, reading, error, zone } = model;
   const place = placeLine(model);
 
   const verdict = !link
@@ -28,10 +28,11 @@ export function LinkDesk({ model }: { model: LinkModel }) {
     const lines = [
       "T3x Link report · Futuret3ch",
       `Online: ${link?.online ? "yes" : "no"}`,
-      `Transport: ${link?.typeLabel ?? "—"}`,
-      `Browser class: ${link?.effectiveLabel ?? "—"}`,
-      `Downlink hint: ${formatMbps(link?.downlink ?? null)}`,
-      `Round-trip hint: ${formatMs(link?.rtt ?? null)}`,
+      `Transport: ${link?.type === "unknown" ? "hidden by this browser" : (link?.typeLabel ?? "—")}`,
+      `Measured ping: ${formatMs(path?.pingMs ?? null)}`,
+      `Short download: ${formatMbps(path?.downMbps ?? null)}`,
+      `Browser downlink hint: ${formatMbps(link?.downlink ?? null)}`,
+      `Browser round-trip hint: ${formatMs(link?.rtt ?? null)}`,
       `Data saver: ${link?.saveData ? "on" : "off"}`,
       `Public address: ${identity?.ip ?? "—"}`,
       `Provider: ${identity?.holder || "—"}`,
@@ -55,32 +56,46 @@ export function LinkDesk({ model }: { model: LinkModel }) {
       <section className="card accent-rail" aria-live="polite">
         <p className="kicker">This link</p>
         <h2 className="mt-2 text-2xl font-semibold">{verdict}</h2>
-        <p className="mt-2 max-w-2xl text-base text-fg">
-          Websites cannot list nearby Wi-Fi names. T3x reads the link this browser will admit, then
-          looks up the public address you are actually using.
+        <p className="mt-2 text-base text-fg">
+          A website cannot see nearby Wi-Fi names, and iPhone hides whether you are on 5G or Wi-Fi. T3x times the path you are actually using, then looks up that public address.
         </p>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <article className="card">
           <p className="stat-label">Transport</p>
-          <p className="stat-value mt-2">{link?.typeLabel ?? "—"}</p>
-          <p className="mt-1 text-base text-fg">{link?.effectiveLabel ?? "Waiting"}</p>
+          <p className="stat-value mt-2">{link?.type === "unknown" ? "Hidden" : (link?.typeLabel ?? "—")}</p>
+          <p className="mt-1 text-base text-fg">
+            {link?.type === "unknown"
+              ? "This browser will not say Wi-Fi or 5G. The status bar still does."
+              : link?.effectiveLabel}
+          </p>
         </article>
         <article className="card">
-          <p className="stat-label">Downlink hint</p>
-          <p className="stat-value mt-2">{formatMbps(link?.downlink ?? null)}</p>
-          <p className="mt-1 text-base text-fg">Browser estimate, often capped</p>
+          <p className="stat-label">Measured ping</p>
+          <p className="stat-value mt-2">{formatMs(path?.pingMs ?? null)}</p>
+          <p className="mt-1 text-base text-fg">Timed on this phone, not a browser guess</p>
         </article>
         <article className="card">
-          <p className="stat-label">Round trip hint</p>
-          <p className="stat-value mt-2">{formatMs(link?.rtt ?? null)}</p>
-          <p className="mt-1 text-base text-fg">Not a speed test</p>
+          <p className="stat-label">Short download</p>
+          <p className="stat-value mt-2">{formatMbps(path?.downMbps ?? null)}</p>
+          <p className="mt-1 text-base text-fg">A small sample. The bench is the full test.</p>
         </article>
         <article className="card">
-          <p className="stat-label">Data saver</p>
-          <p className="stat-value mt-2">{link ? (link.saveData ? "On" : "Off") : "—"}</p>
-          <p className="mt-1 text-base text-fg">{link?.online ? "Path is up" : "Path is down"}</p>
+          <p className="stat-label">This phone</p>
+          <p className="stat-value mt-2">
+            {phone?.battery != null ? `${phone.battery}%` : phone?.touch ? "Touch" : "—"}
+          </p>
+          <p className="mt-1 text-base text-fg">
+            {[
+              phone?.cores ? `${phone.cores} cores` : "",
+              phone?.memoryGb ? `${phone.memoryGb} GB` : "",
+              phone?.screen || "",
+              phone?.charging ? "Charging" : "",
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Reading the device…"}
+          </p>
         </article>
       </section>
 
@@ -139,7 +154,9 @@ export function LinkDesk({ model }: { model: LinkModel }) {
           <p className="mt-3 text-base text-fg">
             {nat?.hiddenLocal
               ? "The browser hid the LAN address behind an mDNS name. That is normal."
-              : "Browsers do not scan other devices on the LAN. This only lists candidates this page was allowed to see."}
+              : nat && nat.local.length === 0 && nat.reflexive.length === 0
+                ? "Nothing came back. Private Relay and some phones block this. It is not a scan of other devices."
+                : "Browsers do not scan other devices on the LAN. This only lists candidates this page was allowed to see."}
           </p>
         </article>
       </section>

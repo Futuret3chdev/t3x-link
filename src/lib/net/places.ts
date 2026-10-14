@@ -16,7 +16,7 @@ type NominatimRow = {
   extratags?: Record<string, string>;
 };
 
-const SEARCHES = ["library", "community centre", "coworking", "internet cafe"];
+const SEARCHES = ["library", "community centre", "coworking", "internet cafe", "cafe"];
 
 function httpUrl(value: string | undefined): string | null {
   if (!value) return null;

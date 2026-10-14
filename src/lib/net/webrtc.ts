@@ -4,7 +4,7 @@ function empty(): NatReport {
   return { local: [], reflexive: [], relay: false, hiddenLocal: false };
 }
 
-export function probeNat(timeoutMs = 3500): Promise<NatReport> {
+export function probeNat(timeoutMs = 8000): Promise<NatReport> {
   if (typeof RTCPeerConnection === "undefined") return Promise.resolve(empty());
 
   return new Promise((resolve) => {
@@ -12,7 +12,9 @@ export function probeNat(timeoutMs = 3500): Promise<NatReport> {
     const reflexive = new Set<string>();
     let relay = false;
     let settled = false;
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }],
+    });
 
     const finish = () => {
       if (settled) return;

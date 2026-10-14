@@ -42,15 +42,23 @@ export function Command() {
         </div>
         <p className="flex shrink-0 items-center gap-2 text-base font-semibold">
           <span className="live-dot" data-off={online ? "false" : "true"} />
-          {model.link ? (model.link.online ? model.link.effectiveLabel : "Offline") : "Checking"}
+          {model.link
+            ? model.link.online
+              ? model.path
+                ? `${Math.round(model.path.pingMs)} ms`
+                : model.link.effectiveType === "unknown"
+                  ? "Online"
+                  : model.link.effectiveLabel
+              : "Offline"
+            : "Checking"}
         </p>
       </header>
 
       <main className="page-pad mx-auto grid max-w-6xl gap-5 px-4 sm:px-6">
-        <p className="max-w-2xl text-base text-fg">
+        <p className="text-base text-fg">
           Read this connection, find mapped public hotspots, watch the Starlink fleet, and bench the path.
         </p>
-        <div role="tablist" aria-label="Desks" className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1">
+        <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (
             <button
               key={item.id}

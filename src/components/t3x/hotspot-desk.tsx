@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { GeoJSONSource, Map as MlMap } from "maplibre-gl";
-import { ExternalLink, LocateFixed, MapPin, Search } from "lucide-react";
-import { openDeskMap } from "@/components/t3x/desk-map";
-import { cssColor, formatDistance } from "@/lib/net/format";
+import { useMemo, useState } from "react";
+import { Bluetooth, ExternalLink, LocateFixed, MapPin, Search } from "lucide-react";
+import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
+import { formatDistance } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
+import { pickBluetooth } from "@/lib/net/phone";
 import { geocodePlace, searchHotspots } from "@/lib/net/places";
 import type { FieldKind, Hotspot } from "@/lib/net/types";
 import type { LinkModel } from "@/components/t3x/use-link";
@@ -28,37 +28,27 @@ function noteKind(kind: Hotspot["kind"]): FieldKind {
   return kind === "wifi" ? "hotspot" : "place";
 }
 
-function markers(center: Place | null, spots: Hotspot[]) {
-  const features = [];
-  if (center) {
-    features.push({
-      type: "Feature" as const,
-      geometry: { type: "Point" as const, coordinates: [center.lon, center.lat] as [number, number] },
-      properties: { name: "Search point", role: "center", free: 0 },
-    });
-  }
-  for (const spot of spots) {
-    features.push({
-      type: "Feature" as const,
-      geometry: { type: "Point" as const, coordinates: [spot.lon, spot.lat] as [number, number] },
-      properties: { name: spot.name, role: "spot", free: spot.free ? 1 : 0 },
-    });
-  }
-  return { type: "FeatureCollection" as const, features };
+function markers(center: Place | null, spots: Hotspot[]): MapDot[] {
+  const dots: MapDot[] = spots.map((spot) => ({
+    lon: spot.lon,
+    lat: spot.lat,
+    tone: spot.free ? "gold" : "ivory",
+    label: `${spot.name} · ${formatDistance(spot.distanceM)}`,
+  }));
+  if (center) dots.push({ lon: center.lon, lat: center.lat, tone: "cobalt", label: center.label });
+  return dots;
 }
 
 export function HotspotDesk({ model, active }: { model: LinkModel; active: boolean }) {
-  const mapEl = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MlMap | null>(null);
   const [query, setQuery] = useState("");
   const [center, setCenter] = useState<Place | null>(null);
   const [radius, setRadius] = useState(1500);
   const [filter, setFilter] = useState<Filter>("all");
   const [spots, setSpots] = useState<Hotspot[]>([]);
-  const [busy, setBusy] = useState<"locate" | "search" | "scan" | null>(null);
+  const [busy, setBusy] = useState<"locate" | "search" | "scan" | "ble" | null>(null);
   const [error, setError] = useState("");
   const [savedId, setSavedId] = useState("");
-  const [mapReady, setMapReady] = useState(false);
+  const [bleName, setBleName] = useState("");
 
   const visible = useMemo(() => {
     return spots.filter((spot) => {
@@ -69,81 +59,7 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
     });
   }, [filter, spots]);
 
-  useEffect(() => {
-    if (!active || !mapEl.current) return;
-    const frame = mapEl.current;
-    let dead = false;
-    let destroy = () => {};
-    void openDeskMap(frame, { center: [151.2093, -33.8688], zoom: 2 }).then((handle) => {
-      if (dead) {
-        handle.destroy();
-        return;
-      }
-      mapRef.current = handle.map;
-      destroy = handle.destroy;
-      handle.map.on("load", () => {
-        const map = mapRef.current;
-        if (!map) return;
-        const cobalt = cssColor("--color-primary", "#2f7bff");
-        const gold = cssColor("--color-accent", "#d4b15a");
-        const ink = cssColor("--color-bg", "#07080d");
-        const ivory = cssColor("--color-fg", "#f4efe6");
-        map.addSource("places", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addLayer({
-          id: "places",
-          type: "circle",
-          source: "places",
-          paint: {
-            "circle-radius": ["case", ["==", ["get", "role"], "center"], 8, 7],
-            "circle-color": [
-              "case",
-              ["==", ["get", "role"], "center"],
-              cobalt,
-              ["==", ["get", "free"], 1],
-              gold,
-              ink,
-            ],
-            "circle-stroke-width": 2,
-            "circle-stroke-color": [
-              "case",
-              ["==", ["get", "role"], "center"],
-              cobalt,
-              ["==", ["get", "free"], 1],
-              gold,
-              ivory,
-            ],
-          },
-        });
-        map.on("click", "places", (event) => {
-          const feature = event.features?.[0];
-          if (!feature || feature.geometry.type !== "Point") return;
-          new handle.ml.Popup({ closeButton: false, offset: 10 })
-            .setLngLat(feature.geometry.coordinates as [number, number])
-            .setText(String(feature.properties?.name || "Place"))
-            .addTo(map);
-        });
-        setMapReady(true);
-      });
-    });
-    return () => {
-      dead = true;
-      mapRef.current = null;
-      setMapReady(false);
-      destroy();
-    };
-  }, [active]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!mapReady || !map || !map.getSource("places")) return;
-    (map.getSource("places") as GeoJSONSource).setData(markers(center, visible));
-    if (!center) return;
-    map.easeTo({
-      center: [center.lon, center.lat],
-      zoom: radius > 2500 ? 12 : 14,
-      duration: 500,
-    });
-  }, [center, mapReady, radius, visible]);
+  const dots = useMemo(() => markers(center, visible), [center, visible]);
 
   async function scan(lat: number, lon: number, label: string, nextRadius = radius) {
     setCenter({ lat, lon, label });
@@ -160,16 +76,17 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
     }
   }
 
-  function locate() {
+  function locate(nextRadius = radius) {
     if (!navigator.geolocation) {
       setError("This browser has no location service.");
       return;
     }
     setBusy("locate");
     setError("");
+    setRadius(nextRadius);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        void scan(pos.coords.latitude, pos.coords.longitude, "Your position");
+        void scan(pos.coords.latitude, pos.coords.longitude, "Your position", nextRadius);
       },
       () => {
         setBusy(null);
@@ -177,6 +94,20 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 60_000 },
     );
+  }
+
+  async function bluetooth() {
+    setBusy("ble");
+    setError("");
+    try {
+      const name = await pickBluetooth();
+      setBleName(name);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Bluetooth chooser closed.";
+      if (!/cancel|abort/i.test(message)) setError(message);
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function searchPlace(event: React.FormEvent) {
@@ -214,10 +145,14 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
       <section className="card">
         <p className="kicker">Public hotspots</p>
         <h2 className="mt-2 text-2xl font-semibold">Mapped places with a reason to have internet</h2>
-        <p className="mt-2 max-w-2xl text-base text-fg">
-          OpenStreetMap places, not a live Wi-Fi scan. “Free” only when the map says the fee is none.
+        <p className="mt-2 text-base text-fg">
+          A phone cannot list nearby Wi-Fi names. This finds mapped libraries, cafés, coworking, and places tagged with internet, around you.
         </p>
-        <form onSubmit={(event) => void searchPlace(event)} className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <button type="button" className="btn btn-primary mt-4 w-full" onClick={() => locate(800)} disabled={busy !== null}>
+          <LocateFixed aria-hidden="true" size={16} />
+          {busy === "locate" ? "Detecting…" : "Detect nearby"}
+        </button>
+        <form onSubmit={(event) => void searchPlace(event)} className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <label className="sr-only" htmlFor="place-query">
             City or address
           </label>
@@ -228,29 +163,32 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
             onChange={(event) => setQuery(event.target.value)}
             placeholder="City, suburb, or address"
           />
-          <button type="submit" className="btn btn-primary" disabled={busy !== null || query.trim().length < 2}>
+          <button type="submit" className="btn btn-ghost w-full sm:w-auto" disabled={busy !== null || query.trim().length < 2}>
             <Search aria-hidden="true" size={16} />
             {busy === "search" ? "Searching…" : "Search"}
           </button>
         </form>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="btn btn-ghost" onClick={locate} disabled={busy !== null}>
-            <LocateFixed aria-hidden="true" size={16} />
-            {busy === "locate" ? "Locating…" : "Use my location"}
-          </button>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {model.identity?.lat != null && model.identity.lon != null ? (
             <button
               type="button"
-              className="btn btn-ghost"
+              className="btn btn-ghost w-full"
               disabled={busy !== null}
-              onClick={() => void scan(model.identity!.lat!, model.identity!.lon!, "Near the public address")}
+              onClick={() => void scan(model.identity!.lat!, model.identity!.lon!, "Near the public address", 1500)}
             >
               <MapPin aria-hidden="true" size={16} />
               Near public address
             </button>
           ) : null}
+          {model.phone?.bluetooth ? (
+            <button type="button" className="btn btn-ghost w-full" onClick={() => void bluetooth()} disabled={busy !== null}>
+              <Bluetooth aria-hidden="true" size={16} />
+              {busy === "ble" ? "Waiting…" : "Bluetooth chooser"}
+            </button>
+          ) : null}
         </div>
-        <div className="mt-3 flex gap-2 overflow-x-auto overscroll-x-contain pb-1">
+        {bleName ? <p className="mt-2 text-base text-fg">Bluetooth device chosen: {bleName}</p> : null}
+        <div className="scroll-row mt-3">
           {CITIES.map((city) => (
             <button
               key={city.name}
@@ -267,7 +205,7 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="order-2 grid gap-3 lg:order-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="scroll-row">
             {RADII.map((value) => (
               <button
                 key={value}
@@ -316,7 +254,7 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
                       {" · "}
                       {formatDistance(spot.distanceM)}
                     </p>
-                    {spot.address ? <p className="mt-1 text-base">{spot.address}</p> : null}
+                    {spot.address ? <p className="plain-text mt-1 text-base">{spot.address}</p> : null}
                     {spot.hours ? <p className="mt-1 text-base text-fg">{spot.hours}</p> : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -343,9 +281,12 @@ export function HotspotDesk({ model, active }: { model: LinkModel; active: boole
             ))}
           </ul>
         </div>
-        <div
-          ref={mapEl}
-          className="desk-map order-1 h-72 w-full overflow-hidden rounded-card border border-line sm:h-80 lg:sticky lg:top-4 lg:order-2 lg:h-[32rem]"
+        <SlippyMap
+          lon={center?.lon ?? 144.9631}
+          lat={center?.lat ?? -37.8136}
+          zoom={center ? (radius > 2500 ? 12 : 14) : 3}
+          dots={active ? dots : []}
+          className="order-1 h-72 w-full rounded-card border border-line sm:h-80 lg:sticky lg:top-4 lg:order-2 lg:h-[32rem]"
         />
       </div>
     </div>

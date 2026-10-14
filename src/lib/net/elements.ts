@@ -75,6 +75,49 @@ async function fetchCatalog(): Promise<StarlinkCatalog> {
   throw new Error(last);
 }
 
+export const GROUPS = ["stations", "gps-ops", "glo-ops", "galileo", "weather", "visual", "starlink", "iridium-NEXT", "oneweb"] as const;
+
+export type CatalogGroup = (typeof GROUPS)[number];
+
+const groupCache = new Map<string, { at: number; catalog: StarlinkCatalog }>();
+const groupPending = new Map<string, Promise<StarlinkCatalog>>();
+
+async function fetchGroup(group: CatalogGroup): Promise<StarlinkCatalog> {
+  const url = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": UA, Accept: "text/plain" },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) throw new Error("The orbit catalogue did not answer.");
+  const elements = parseTle(await res.text());
+  if (elements.length < 3) throw new Error("That catalogue came back empty.");
+  return { source: "CelesTrak", fetchedAt: Date.now(), elements };
+}
+
+export const loadCatalog = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const group = String((input as { group?: unknown })?.group || "");
+    if (!GROUPS.includes(group as CatalogGroup)) throw new Error("That group is not tracked.");
+    return { group: group as CatalogGroup };
+  })
+  .handler(async ({ data }): Promise<StarlinkCatalog> => {
+    const hit = groupCache.get(data.group);
+    if (hit && Date.now() - hit.at < TTL) return hit.catalog;
+    let pending = groupPending.get(data.group);
+    if (!pending) {
+      pending = fetchGroup(data.group)
+        .then((catalog) => {
+          groupCache.set(data.group, { at: Date.now(), catalog });
+          return catalog;
+        })
+        .finally(() => {
+          groupPending.delete(data.group);
+        });
+      groupPending.set(data.group, pending);
+    }
+    return pending;
+  });
+
 export const loadStarlinkCatalog = createServerFn({ method: "GET" }).handler(async (): Promise<StarlinkCatalog> => {
   if (cached && Date.now() - cached.at < TTL) return cached.catalog;
   if (!pending) {

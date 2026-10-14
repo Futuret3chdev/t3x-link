@@ -47,6 +47,78 @@ export function prepareElements(elements: ElementSet[]): PreparedSat[] {
   return prepared;
 }
 
+export function lookAngles(sat: PreparedSat, observer: Observer, date: Date): { az: number; el: number } | null {
+  try {
+    const gmst = gstime(date);
+    const pv = propagate(sat.satrec, date);
+    if (!pv || !pv.position || typeof pv.position === "boolean") return null;
+    const site = {
+      longitude: degreesToRadians(observer.lon),
+      latitude: degreesToRadians(observer.lat),
+      height: 0.05,
+    };
+    const look = ecfToLookAngles(site, eciToEcf(pv.position, gmst));
+    const toDeg = 180 / Math.PI;
+    return { az: (look.azimuth * toDeg + 360) % 360, el: look.elevation * toDeg };
+  } catch {
+    return null;
+  }
+}
+
+export async function projectSky(
+  prepared: PreparedSat[],
+  observer: Observer,
+  cancelled: () => boolean,
+): Promise<SkyDot[]> {
+  const date = new Date();
+  const sky: SkyDot[] = [];
+  for (let index = 0; index < prepared.length; index += 900) {
+    if (cancelled()) throw new Error("cancelled");
+    const end = Math.min(prepared.length, index + 900);
+    for (let cursor = index; cursor < end; cursor += 1) {
+      const look = lookAngles(prepared[cursor], observer, date);
+      if (!look || look.el <= 0) continue;
+      sky.push({ name: prepared[cursor].name, az: look.az, el: look.el });
+    }
+    if (end < prepared.length) await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  sky.sort((a, b) => b.el - a.el);
+  return sky;
+}
+
+export type PassWindow = {
+  start: number;
+  peak: number;
+  end: number;
+  maxEl: number;
+  riseAz: number;
+  setAz: number;
+};
+
+export function nextPass(sat: PreparedSat, observer: Observer, from = Date.now()): PassWindow | null {
+  const step = 30_000;
+  const limit = 18 * 60 * 60 * 1000;
+  const horizon = 10;
+  let rise: { t: number; az: number } | null = null;
+  let maxEl = -90;
+  let peak = from;
+  for (let offset = 0; offset <= limit; offset += step) {
+    const at = from + offset;
+    const look = lookAngles(sat, observer, new Date(at));
+    if (!look) continue;
+    if (look.el >= horizon) {
+      if (!rise) rise = { t: at, az: look.az };
+      if (look.el > maxEl) {
+        maxEl = look.el;
+        peak = at;
+      }
+    } else if (rise) {
+      return { start: rise.t, peak, end: at, maxEl, riseAz: rise.az, setAz: look.az };
+    }
+  }
+  return null;
+}
+
 export async function projectConstellation(
   prepared: PreparedSat[],
   observer: Observer | null,

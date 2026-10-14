@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useConstellation } from "@/components/t3x/use-constellation";
+import { TrackerDesk } from "@/components/t3x/tracker-desk";
 import { formatMbps, formatMs } from "@/lib/net/format";
 import { readBenchHistory, readJournal, readPings, subscribeMemory, type PingMark } from "@/lib/net/memory";
 import { runTool, type ToolKind, type ToolReport } from "@/lib/net/tools";
@@ -36,12 +36,6 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const [report, setReport] = useState<ToolReport | null>(null);
   const [toolError, setToolError] = useState("");
   const [toolBusy, setToolBusy] = useState(false);
-
-  const observer =
-    model.identity?.lat != null && model.identity.lon != null
-      ? { lat: model.identity.lat, lon: model.identity.lon }
-      : null;
-  const sky = useConstellation(observer);
 
   useEffect(() => {
     const sync = () => {
@@ -90,7 +84,6 @@ export function HubDesk({ model }: { model: LinkModel }) {
   }
 
   const peak = Math.max(1, ...pings.map((row) => row.pingMs));
-  const highest = sky.summary.highest;
   const channels = ["wifi", "cellular", link?.type || "wifi"].filter((type, index, all) => type && type !== "unknown" && all.indexOf(type) === index);
 
   return (
@@ -118,13 +111,6 @@ export function HubDesk({ model }: { model: LinkModel }) {
           <p className="stat-label">Provider</p>
           <p className="mt-2 text-lg font-semibold">{model.identity?.holder || (model.reading ? "Looking up…" : "—")}</p>
           <p className="mt-1 text-base text-fg">{model.identity?.starlink ? "Starlink" : model.identity?.city || "Public path"}</p>
-        </article>
-        <article className="card">
-          <p className="stat-label">Overhead</p>
-          <p className="stat-value mt-2">{sky.phase === "live" ? sky.summary.above : "…"}</p>
-          <p className="mt-1 text-base text-fg">
-            {highest ? `${highest.name} ${Math.round(highest.el)}°` : sky.phase === "error" ? "Sky unread" : "Reading the sky"}
-          </p>
         </article>
       </section>
 
@@ -172,6 +158,8 @@ export function HubDesk({ model }: { model: LinkModel }) {
           </article>
         </section>
       ) : null}
+
+      <TrackerDesk model={model} />
 
       <section className="card grid gap-3">
         <p className="kicker">Paths</p>

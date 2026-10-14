@@ -41,6 +41,9 @@ function kindOf(type: string, tags: Record<string, string>): { kind: Hotspot["ki
   if (type.includes("cowork")) return { kind: "cowork", kindLabel: "Cowork" };
   if (type.includes("cafe")) return { kind: "cafe", kindLabel: "Café" };
   if (type.includes("community")) return { kind: "community", kindLabel: "Community" };
+  if (type.includes("university") || type.includes("college")) return { kind: "place", kindLabel: "University" };
+  if (type.includes("hostel")) return { kind: "place", kindLabel: "Hostel" };
+  if (type.includes("hotel")) return { kind: "place", kindLabel: "Hotel" };
   if (tags.internet_access) return { kind: "wifi", kindLabel: "Mapped Wi-Fi" };
   return { kind: "place", kindLabel: "Place" };
 }
@@ -63,28 +66,31 @@ async function nominatim(params: Record<string, string>): Promise<NominatimRow[]
 
 export const searchHotspots = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
-    const raw = input as { lat?: unknown; lon?: unknown; radius?: unknown };
+    const raw = input as { lat?: unknown; lon?: unknown; radius?: unknown; q?: unknown };
     const lat = Number(raw?.lat);
     const lon = Number(raw?.lon);
     const radius = Math.round(Number(raw?.radius));
+    const q = String(raw?.q || "").trim().slice(0, 40);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new Error("Latitude is out of range.");
     if (!Number.isFinite(lon) || lon < -180 || lon > 180) throw new Error("Longitude is out of range.");
     if (!Number.isFinite(radius) || radius < 300 || radius > 6000) throw new Error("Pick a radius between 300 m and 6 km.");
-    return { lat, lon, radius };
+    if (q && !/^[a-z0-9_\[\] ]+$/i.test(q)) throw new Error("That scan step is not valid.");
+    return { lat, lon, radius, q };
   })
   .handler(async ({ data }): Promise<Hotspot[]> => {
-    const { lat, lon, radius } = data;
+    const { lat, lon, radius, q } = data;
     const box = viewbox(lat, lon, radius);
     const spots: Hotspot[] = [];
     const seen = new Set<string>();
-    for (const q of SEARCHES) {
+    const queries = q ? [q] : SEARCHES;
+    for (const query of queries) {
       const rows = await nominatim({
         format: "jsonv2",
-        limit: "12",
+        limit: "15",
         bounded: "1",
         extratags: "1",
         viewbox: box,
-        q,
+        q: query,
       });
       for (const row of rows) {
         const pointLat = Number(row.lat);
@@ -93,10 +99,10 @@ export const searchHotspots = createServerFn({ method: "POST" })
         const id = `${row.osm_type || "n"}/${row.osm_id ?? spots.length}`;
         if (seen.has(id)) continue;
         const tags = row.extratags || {};
-        const type = `${row.type || ""} ${row.category || ""}`.toLowerCase();
-        if (!isUseful(type, tags)) continue;
+        const type = `${row.type || ""} ${row.category || ""} ${query}`.toLowerCase();
+        if (!q && !isUseful(type, tags)) continue;
         const distanceM = haversine(lat, lon, pointLat, pointLon);
-        if (distanceM > radius * 1.08) continue;
+        if (distanceM > radius * 1.15) continue;
         seen.add(id);
         const kind = kindOf(type, tags);
         const fee = `${tags["internet_access:fee"] || ""} ${tags.fee || ""}`.toLowerCase();

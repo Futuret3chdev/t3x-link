@@ -3,7 +3,7 @@ import { LocateFixed, Wifi } from "lucide-react";
 import mark from "@/assets/t3x-mark.jpg";
 import { BenchDesk } from "@/components/t3x/bench-desk";
 import { FieldDesk } from "@/components/t3x/field-desk";
-import { HotspotDesk } from "@/components/t3x/hotspot-desk";
+import { HotspotDesk, type ScanFix } from "@/components/t3x/hotspot-desk";
 import { LinkDesk } from "@/components/t3x/link-desk";
 import { StarlinkDesk } from "@/components/t3x/starlink-desk";
 import { useLink } from "@/components/t3x/use-link";
@@ -22,10 +22,38 @@ type TabId = (typeof TABS)[number]["id"];
 export function Command() {
   const model = useLink();
   const [tab, setTab] = useState<TabId>("hotspots");
-  const [scanNonce, setScanNonce] = useState(0);
+  const [fix, setFix] = useState<ScanFix | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState("");
   const [network, setNetwork] = useState("");
   const [joinNote, setJoinNote] = useState("");
   const online = model.link?.online !== false;
+
+  function scanNow() {
+    setTab("hotspots");
+    setScanNote("");
+    if (!navigator.geolocation) {
+      setScanNote("This phone has no location service.");
+      return;
+    }
+    setScanning(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setScanning(false);
+        setFix({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          acc: Math.round(pos.coords.accuracy),
+          id: Date.now(),
+        });
+      },
+      () => {
+        setScanning(false);
+        setScanNote("Location is blocked. Allow location for this site, then tap Scan again.");
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  }
 
   async function connect() {
     setJoinNote("");
@@ -75,17 +103,12 @@ export function Command() {
       <main className="page-pad mx-auto grid max-w-6xl gap-5 px-4 sm:px-6">
         <section className="card grid gap-3">
           <p className="kicker">Do this</p>
-          <button
-            type="button"
-            className="btn btn-primary w-full text-lg"
-            onClick={() => {
-              setTab("hotspots");
-              setScanNonce((value) => value + 1);
-            }}
-          >
+          <button type="button" className="btn btn-primary w-full text-lg" onClick={scanNow} disabled={scanning}>
             <LocateFixed aria-hidden="true" size={18} />
-            Scan
+            {scanning ? "Scanning…" : "Scan"}
           </button>
+          {scanNote ? <p className="text-base text-fg">{scanNote}</p> : null}
+          {fix ? <p className="text-base text-fg">Location locked to about {fix.acc} m.</p> : null}
           <label className="grid gap-1 text-base font-semibold" htmlFor="open-network">
             Open network name
             <input
@@ -102,17 +125,6 @@ export function Command() {
             Connect
           </button>
           {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
-          <p className="kicker">Promo</p>
-          <video
-            className="max-h-[50vh] w-full rounded-xl bg-black object-contain"
-            controls
-            playsInline
-            preload="metadata"
-            poster="/promo-poster.jpg"
-            src="/promo.mp4"
-          >
-            Futuret3ch and T3x
-          </video>
         </section>
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (
@@ -136,12 +148,7 @@ export function Command() {
         </div>
         <div role="tabpanel" id="panel-hotspots" aria-labelledby="tab-hotspots" hidden={tab !== "hotspots"}>
           {tab === "hotspots" ? (
-            <HotspotDesk
-              model={model}
-              active
-              scanNonce={scanNonce}
-              onNamed={(ssid) => setNetwork((current) => current || ssid)}
-            />
+            <HotspotDesk model={model} active fix={fix} onNamed={(ssid) => setNetwork((current) => current || ssid)} />
           ) : null}
         </div>
         <div role="tabpanel" id="panel-starlink" aria-labelledby="tab-starlink" hidden={tab !== "starlink"}>

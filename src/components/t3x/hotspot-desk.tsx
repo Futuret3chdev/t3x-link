@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bluetooth, ExternalLink, LocateFixed, MapPin, Search, Wifi } from "lucide-react";
+import { Bluetooth, ExternalLink, LocateFixed, MapPin, Navigation, Search, Share2, Wifi } from "lucide-react";
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { formatDistance } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
@@ -40,15 +40,33 @@ function markers(center: Place | null, spots: Hotspot[]): MapDot[] {
   return dots;
 }
 
+const STEPS: { q: string; label: string }[] = [
+  { q: "[library]", label: "libraries" },
+  { q: "[cafe]", label: "cafés" },
+  { q: "[community_centre]", label: "community rooms" },
+  { q: "[university]", label: "universities" },
+  { q: "[hostel]", label: "hostels" },
+  { q: "[hotel]", label: "hotels" },
+];
+
+export type ScanFix = { lat: number; lon: number; acc: number; id: number };
+
+function directionsUrl(lat: number, lon: number): string {
+  const apple = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  return apple
+    ? `https://maps.apple.com/?daddr=${lat},${lon}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+}
+
 export function HotspotDesk({
   model,
   active,
-  scanNonce,
+  fix,
   onNamed,
 }: {
   model: LinkModel;
   active: boolean;
-  scanNonce: number;
+  fix: ScanFix | null;
   onNamed: (ssid: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -61,14 +79,18 @@ export function HotspotDesk({
   const [savedId, setSavedId] = useState("");
   const [bleName, setBleName] = useState("");
   const [joinNote, setJoinNote] = useState("");
+  const [status, setStatus] = useState("");
+  const [accuracy, setAccuracy] = useState<number | null>(null);
 
   const visible = useMemo(() => {
-    return spots.filter((spot) => {
-      if (filter === "free") return spot.free;
-      if (filter === "library") return spot.kind === "library";
-      if (filter === "cafe") return spot.kind === "cafe" || spot.kind === "cowork";
-      return true;
-    });
+    return spots
+      .filter((spot) => {
+        if (filter === "free") return spot.free;
+        if (filter === "library") return spot.kind === "library";
+        if (filter === "cafe") return spot.kind === "cafe" || spot.kind === "cowork";
+        return true;
+      })
+      .sort((a, b) => Number(b.free) - Number(a.free) || a.distanceM - b.distanceM);
   }, [filter, spots]);
 
   const dots = useMemo(() => markers(center, visible), [center, visible]);
@@ -84,17 +106,29 @@ export function HotspotDesk({
     }
   }
 
-  async function scan(lat: number, lon: number, label: string, nextRadius = radius) {
+  async function scan(lat: number, lon: number, label: string, nextRadius = radius, widen = true) {
     setCenter({ lat, lon, label });
     setBusy("scan");
     setError("");
+    setRadius(nextRadius);
+    const merged = new Map<string, Hotspot>();
     try {
-      const rows = await searchHotspots({ data: { lat, lon, radius: nextRadius } });
-      setSpots(rows);
-      const named = rows.find((row) => row.free && row.ssid) || rows.find((row) => row.ssid);
+      for (const step of STEPS) {
+        setStatus(`Scanning ${step.label}…`);
+        const rows = await searchHotspots({ data: { lat, lon, radius: nextRadius, q: step.q } });
+        for (const row of rows) merged.set(row.id, row);
+        setSpots([...merged.values()].sort((a, b) => a.distanceM - b.distanceM));
+      }
+      const named = [...merged.values()].find((row) => row.free && row.ssid) || [...merged.values()].find((row) => row.ssid);
       if (named?.ssid) onNamed(named.ssid);
+      if (widen && merged.size < 2 && nextRadius < 4000) {
+        setStatus("Almost nothing that close. Opening the scan to 4 km…");
+        await scan(lat, lon, label, 4000, false);
+        return;
+      }
+      setStatus(merged.size === 0 ? "No mapped places in this scan." : `${merged.size} places`);
     } catch (reason) {
-      setSpots([]);
+      if (merged.size === 0) setSpots([]);
       setError(reason instanceof Error ? reason.message : "Hotspot search failed.");
     } finally {
       setBusy(null);
@@ -108,25 +142,29 @@ export function HotspotDesk({
     }
     setBusy("locate");
     setError("");
+    setStatus("Reading your location…");
     setRadius(nextRadius);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setAccuracy(Math.round(pos.coords.accuracy));
         void scan(pos.coords.latitude, pos.coords.longitude, "Your position", nextRadius);
       },
       () => {
         setBusy(null);
-        setError("Location was blocked. Search a city, or use the public-address estimate.");
+        setStatus("");
+        setError("Location is blocked. Allow location for this site, then tap Scan again.");
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60_000 },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   }
 
   useEffect(() => {
-    if (scanNonce < 1) return;
-    locate(800);
-    // scanNonce is the only trigger; locate closes over the latest radius setter.
+    if (!fix) return;
+    setAccuracy(fix.acc);
+    void scan(fix.lat, fix.lon, "Your position", 1500);
+    // The tap already asked for location. This only looks up places.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanNonce]);
+  }, [fix?.id]);
 
   async function bluetooth() {
     setBusy("ble");
@@ -172,18 +210,38 @@ export function HotspotDesk({
     setSavedId(spot.id);
   }
 
+  async function shareScan() {
+    const lines = visible
+      .slice(0, 8)
+      .map((spot) => `${spot.name} · ${formatDistance(spot.distanceM)}`)
+      .join("\n");
+    const text = lines ? `T3x Link scan\n${lines}` : "T3x Link scan";
+    try {
+      if (navigator.share) await navigator.share({ title: "T3x Link scan", text });
+      else {
+        await navigator.clipboard.writeText(text);
+        setStatus("Scan copied.");
+      }
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "";
+      if (!/abort|cancel/i.test(message)) setError("Could not share that scan.");
+    }
+  }
+
   return (
     <div className="grid gap-4">
       <section className="card">
         <p className="kicker">Public hotspots</p>
-        <h2 className="mt-2 text-2xl font-semibold">Scan, then connect</h2>
+        <h2 className="mt-2 text-2xl font-semibold">Scan around this phone</h2>
         <p className="mt-2 text-base text-fg">
-          Scan uses your location for mapped places. Connect joins an open network by name. This phone will not list Wi-Fi names on its own.
+          Scan reads your location, then lists mapped libraries, cafés, universities, hostels, hotels, and community rooms. It cannot read Wi-Fi names. Those only appear if the map published them.
         </p>
-        <button type="button" className="btn btn-primary mt-4 w-full text-lg" onClick={() => locate(800)} disabled={busy !== null}>
+        <button type="button" className="btn btn-primary mt-4 w-full text-lg" onClick={() => locate(1500)} disabled={busy !== null}>
           <LocateFixed aria-hidden="true" size={18} />
           {busy === "locate" || busy === "scan" ? "Scanning…" : "Scan"}
         </button>
+        {accuracy != null ? <p className="mt-2 text-base text-fg">Location locked to about {accuracy} m.</p> : null}
+        {status ? <p className="mt-1 text-base font-semibold text-fg">{status}</p> : null}
         <form onSubmit={(event) => void searchPlace(event)} className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <label className="sr-only" htmlFor="place-query">
             City or address
@@ -273,7 +331,13 @@ export function HotspotDesk({
               Connect {nearestOpen.ssid}
             </button>
           ) : null}
-          {busy === "scan" ? <p className="text-base text-fg">Searching mapped places…</p> : null}
+          {busy === "scan" || busy === "locate" ? <p className="text-base text-fg">{status || "Scanning…"}</p> : null}
+          {visible.length > 0 ? (
+            <button type="button" className="btn btn-ghost w-full" onClick={() => void shareScan()}>
+              <Share2 aria-hidden="true" size={16} />
+              Share this scan
+            </button>
+          ) : null}
           {center && !busy && !error && visible.length === 0 ? (
             <p className="text-base text-fg">
               Nothing tagged around {center.label}. Widen the radius, or this part of the map has no internet places yet.
@@ -304,6 +368,15 @@ export function HotspotDesk({
                         Connect
                       </button>
                     ) : null}
+                    <a
+                      className="btn btn-ghost"
+                      href={directionsUrl(spot.lat, spot.lon)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Navigation aria-hidden="true" size={16} />
+                      Directions
+                    </a>
                     <a
                       className="btn btn-ghost"
                       href={`https://www.openstreetmap.org/?mlat=${spot.lat}&mlon=${spot.lon}#map=18/${spot.lat}/${spot.lon}`}

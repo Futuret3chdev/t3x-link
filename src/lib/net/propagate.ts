@@ -47,6 +47,19 @@ export function prepareElements(elements: ElementSet[]): PreparedSat[] {
   return prepared;
 }
 
+export function groundPoint(sat: PreparedSat, date: Date): { name: string; lat: number; lon: number; altKm: number } | null {
+  try {
+    const gmst = gstime(date);
+    const pv = propagate(sat.satrec, date);
+    if (!pv || !pv.position || typeof pv.position === "boolean") return null;
+    const geo = eciToGeodetic(pv.position, gmst);
+    const toDeg = 180 / Math.PI;
+    return { name: sat.name, lat: geo.latitude * toDeg, lon: geo.longitude * toDeg, altKm: geo.height };
+  } catch {
+    return null;
+  }
+}
+
 export function lookAngles(sat: PreparedSat, observer: Observer, date: Date): { az: number; el: number; rangeKm: number } | null {
   try {
     const gmst = gstime(date);

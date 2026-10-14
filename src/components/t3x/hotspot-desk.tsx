@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bluetooth, LocateFixed, MapPin, Search, Share2, Wifi } from "lucide-react";
 import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
-import { WifiGlobe } from "@/components/t3x/wifi-globe";
+import { FleetGlobe } from "@/components/t3x/fleet-globe";
 import { formatDistance } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
 import { pickBluetooth } from "@/lib/net/phone";
@@ -428,8 +428,7 @@ export function HotspotDesk({
           </div>
           {viewMode === "globe" ? (
             <>
-              <WifiGlobe spots={visible.map((spot) => ({ name: spot.name, lat: spot.lat, lon: spot.lon, free: spot.free }))} />
-              <p className="text-base text-fg">Gold is a major wifi city. Blue is a place from this scan. Drag to turn it.</p>
+              <FleetGlobe observer={center ? { lat: center.lat, lon: center.lon } : null} />
             </>
           ) : (
             <>

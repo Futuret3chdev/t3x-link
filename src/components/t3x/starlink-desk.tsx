@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Compass, Copy, LocateFixed, Navigation } from "lucide-react";
-import { ConstellationMap } from "@/components/t3x/constellation-map";
 import { useConstellation } from "@/components/t3x/use-constellation";
 import { readBenchHistory, readSky, subscribeMemory, writeSky } from "@/lib/net/memory";
 import { leoNote } from "@/lib/net/speed";
@@ -247,8 +246,9 @@ export function StarlinkDesk({ model }: { model: LinkModel }) {
             {facing
               ? "The top of the circle is where this phone is pointing. Turn and the sky turns with you."
               : "North is up. Turn the phone, or tap a wedge to mark a roof, tree, or wall."}{" "}
-            The gold ring is 25° above the horizon. Gold dots are Starlink inside that ring. Blue dots are up, but too low for the dish. Red means your mark covers that one.
+            The gold ring is 25° above the horizon. Dots are the Starlink satellites actually above this place.
           </p>
+          {fleet.error ? <p className="mt-2 text-base text-mark">{fleet.error}</p> : null}
           <svg viewBox="0 0 200 200" className="mx-auto mt-4 aspect-square w-full max-w-md" role="group" aria-label={`Sky clearance ${score} percent`}>
             {facing ? <polygon points="100,1.5 95.5,8 104.5,8" fill="var(--color-accent)" /> : null}
             <g transform={spin}>
@@ -383,27 +383,6 @@ export function StarlinkDesk({ model }: { model: LinkModel }) {
           </article>
         </div>
       </div>
-
-      <section className="card">
-        <p className="kicker">The fleet</p>
-        <h2 className="mt-2 text-2xl font-semibold">Where every catalogued Starlink is</h2>
-        <p className="mt-2 text-base text-fg">
-          {fleet.phase === "loading"
-            ? "Fetching the public orbit catalogue…"
-            : fleet.phase === "error"
-              ? fleet.error
-              : `${fleet.summary.total.toLocaleString()} objects placed for ${
-                  fleet.summary.at
-                    ? new Date(fleet.summary.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-                    : "now"
-                }. Gold is inside your 25° window, blue is above the horizon, ivory is the rest of the fleet. The red dot is the place we measured from.`}
-        </p>
-        <p className="mt-2 text-base text-fg">
-          Positions come from public orbital elements ({fleet.source || "CelesTrak"}), stepped forward to this minute. Starlink moves its own satellites, so a dot can be off by a few kilometres. This is not a live feed from SpaceX.
-        </p>
-        {fleet.error && fleet.phase !== "error" ? <p className="mt-2 text-base text-mark">{fleet.error}</p> : null}
-        <ConstellationMap bind={fleet.bindMap} />
-      </section>
 
       <article className="card">
         <p className="kicker">Before you mount</p>

@@ -65,7 +65,6 @@ export function StarlinkLink({ model }: { model: LinkModel }) {
           Save on this phone
         </button>
       </form>
-      <p className="text-base text-fg">A website cannot sign in to a Starlink account. No password is asked or stored.</p>
     </section>
   );
 }

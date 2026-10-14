@@ -270,6 +270,30 @@
     left: 0.85rem;
   }
 
+  .sky-tag {
+    position: absolute;
+    z-index: 2;
+    width: max-content;
+    max-width: 12rem;
+    transform: translate(-50%, -50%);
+    border-radius: 0.8rem;
+    background: color-mix(in srgb, #07080d 78%, transparent);
+    color: #f4efe6;
+    padding: 0.35rem 0.65rem;
+    text-align: center;
+  }
+
+  .sky-readout {
+    position: absolute;
+    z-index: 2;
+    left: 0.85rem;
+    right: 0.85rem;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    color: #f4efe6;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
   .scroll-row {
     display: flex;
     gap: 0.5rem;

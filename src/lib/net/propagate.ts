@@ -13,7 +13,7 @@ export type PreparedSat = { name: string; satrec: ReturnType<typeof twoline2satr
 
 export type Observer = { lat: number; lon: number };
 
-export type SkyDot = { name: string; az: number; el: number };
+export type SkyDot = { name: string; az: number; el: number; rangeKm: number };
 
 export type SatFeatureCollection = {
   type: "FeatureCollection";
@@ -47,7 +47,7 @@ export function prepareElements(elements: ElementSet[]): PreparedSat[] {
   return prepared;
 }
 
-export function lookAngles(sat: PreparedSat, observer: Observer, date: Date): { az: number; el: number } | null {
+export function lookAngles(sat: PreparedSat, observer: Observer, date: Date): { az: number; el: number; rangeKm: number } | null {
   try {
     const gmst = gstime(date);
     const pv = propagate(sat.satrec, date);
@@ -59,7 +59,11 @@ export function lookAngles(sat: PreparedSat, observer: Observer, date: Date): { 
     };
     const look = ecfToLookAngles(site, eciToEcf(pv.position, gmst));
     const toDeg = 180 / Math.PI;
-    return { az: (look.azimuth * toDeg + 360) % 360, el: look.elevation * toDeg };
+    const geo = eciToGeodetic(pv.position, gmst);
+    const height = geo.height;
+    const sinE = Math.sin(look.elevation);
+    const rangeKm = -6371 * sinE + Math.sqrt((6371 * sinE) ** 2 + height * height + 2 * 6371 * height);
+    return { az: (look.azimuth * toDeg + 360) % 360, el: look.elevation * toDeg, rangeKm: Math.max(0, rangeKm) };
   } catch {
     return null;
   }
@@ -78,7 +82,7 @@ export async function projectSky(
     for (let cursor = index; cursor < end; cursor += 1) {
       const look = lookAngles(prepared[cursor], observer, date);
       if (!look || look.el <= 0) continue;
-      sky.push({ name: prepared[cursor].name, az: look.az, el: look.el });
+      sky.push({ name: prepared[cursor].name, az: look.az, el: look.el, rangeKm: look.rangeKm });
     }
     if (end < prepared.length) await new Promise((resolve) => setTimeout(resolve, 0));
   }
@@ -95,9 +99,7 @@ export type PassWindow = {
   setAz: number;
 };
 
-export function nextPass(sat: PreparedSat, observer: Observer, from = Date.now()): PassWindow | null {
-  const step = 30_000;
-  const limit = 18 * 60 * 60 * 1000;
+export function nextPass(sat: PreparedSat, observer: Observer, from = Date.now(), step = 30_000, limit = 18 * 60 * 60 * 1000): PassWindow | null {
   const horizon = 10;
   let rise: { t: number; az: number } | null = null;
   let maxEl = -90;
@@ -117,6 +119,26 @@ export function nextPass(sat: PreparedSat, observer: Observer, from = Date.now()
     }
   }
   return null;
+}
+
+export async function upcomingPasses(
+  sats: PreparedSat[],
+  observer: Observer,
+  cancelled: () => boolean,
+): Promise<Array<PassWindow & { name: string }>> {
+  const found: Array<PassWindow & { name: string }> = [];
+  const heavy = sats.length > 200;
+  const step = heavy ? 120_000 : 60_000;
+  const limit = (heavy ? 6 : 12) * 60 * 60 * 1000;
+  const list = heavy ? sats.slice(0, 40) : sats;
+  for (let index = 0; index < list.length; index += 1) {
+    if (cancelled()) throw new Error("cancelled");
+    const pass = nextPass(list[index], observer, Date.now(), step, limit);
+    if (pass) found.push({ ...pass, name: list[index].name });
+    if (index % 8 === 7) await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  found.sort((a, b) => a.start - b.start);
+  return found.slice(0, 20);
 }
 
 export async function projectConstellation(
@@ -165,7 +187,9 @@ export async function projectConstellation(
             const az = (look.azimuth * toDeg + 360) % 360;
             above += 1;
             if (el >= 25) inWindow += 1;
-            sky.push({ name: sat.name, az, el });
+            const sinE = Math.sin(look.elevation);
+            const rangeKm = -6371 * sinE + Math.sqrt((6371 * sinE) ** 2 + geo.height ** 2 + 2 * 6371 * geo.height);
+            sky.push({ name: sat.name, az, el, rangeKm: Math.max(0, rangeKm) });
             if (!highest || el > highest.el) highest = { name: sat.name, az, el };
           }
         }

@@ -12,9 +12,11 @@ export type Launch = {
   pad: string;
   mission: string;
   upcoming: boolean;
+  webcast: string;
+  live: boolean;
 };
 
-const TTL = 20 * 60 * 1000;
+const TTL = 60 * 1000;
 let cached: { at: number; rows: Launch[] } | null = null;
 let pending: Promise<Launch[]> | null = null;
 
@@ -30,6 +32,8 @@ function mapRow(row: Record<string, unknown>, upcoming: boolean): Launch | null 
   const rocket = row.rocket as { configuration?: { name?: string } } | undefined;
   const pad = row.pad as { name?: string; location?: { name?: string } } | undefined;
   const mission = row.mission as { name?: string; description?: string } | undefined;
+  const videos = Array.isArray(row.vidURLs) ? (row.vidURLs as { url?: string }[]) : [];
+  const webcast = videos.find((item) => typeof item.url === "string" && item.url.startsWith("http"))?.url || "";
   return {
     id: text(row.id) || `${at}`,
     name: text(row.name) || "Launch",
@@ -40,6 +44,8 @@ function mapRow(row: Record<string, unknown>, upcoming: boolean): Launch | null 
     pad: [pad?.name, pad?.location?.name].filter(Boolean).join(" · "),
     mission: mission?.description || mission?.name || "",
     upcoming,
+    webcast,
+    live: Boolean(row.webcast_live),
   };
 }
 

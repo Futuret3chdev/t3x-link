@@ -81,9 +81,21 @@ function remaining(at: number, now: number): string {
   const days = Math.floor(ms / 86_400_000);
   const hours = Math.floor((ms % 86_400_000) / 3_600_000);
   const mins = Math.floor((ms % 3_600_000) / 60_000);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${mins}m`;
-  return `${mins}m`;
+  const secs = Math.floor((ms % 60_000) / 1000);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+  return `${mins}m ${secs}s`;
+}
+
+function youtubeId(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("youtu.be")) return parsed.pathname.slice(1).split("/")[0];
+    if (parsed.hostname.includes("youtube.com")) return parsed.searchParams.get("v") || "";
+  } catch {
+    return "";
+  }
+  return "";
 }
 
 export function TrackerDesk({ model }: { model: LinkModel }) {
@@ -209,19 +221,30 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
 
   useEffect(() => {
     if (mode !== "launches") return;
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    if (launches.length > 0) return () => window.clearInterval(timer);
-    let cancel = false;
-    loadLaunches()
-      .then((rows) => {
-        if (!cancel) setLaunches(rows);
-      })
-      .catch((reason: unknown) => {
-        if (!cancel) setLaunchError(reason instanceof Error ? reason.message : "The launch list did not answer.");
-      });
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const poll = window.setInterval(() => {
+      loadLaunches()
+        .then((rows) => setLaunches(rows))
+        .catch(() => undefined);
+    }, 60_000);
+    if (launches.length === 0) {
+      let cancel = false;
+      loadLaunches()
+        .then((rows) => {
+          if (!cancel) setLaunches(rows);
+        })
+        .catch((reason: unknown) => {
+          if (!cancel) setLaunchError(reason instanceof Error ? reason.message : "The launch list did not answer.");
+        });
+      return () => {
+        cancel = true;
+        window.clearInterval(timer);
+        window.clearInterval(poll);
+      };
+    }
     return () => {
-      cancel = true;
       window.clearInterval(timer);
+      window.clearInterval(poll);
     };
   }, [mode, launches.length]);
 
@@ -242,7 +265,10 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
     setSkyOpen(true);
   }
 
-  const nextUp = launches.find((row) => row.upcoming && row.at >= now) || launches.find((row) => row.upcoming);
+  const coming = launches.filter((row) => row.at >= now - 60_000).sort((a, b) => a.at - b.at);
+  const previous = launches.filter((row) => row.at < now - 60_000).sort((a, b) => b.at - a.at);
+  const nextUp = coming[0];
+  const video = nextUp ? youtubeId(nextUp.webcast) : "";
 
   return (
     <section className="card grid gap-3">
@@ -267,7 +293,7 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
           {!launchError && launches.length === 0 ? <p className="text-base text-fg">Reading the launch list…</p> : null}
           {nextUp ? (
             <article className="launch-hero">
-              <p className="kicker">Upcoming</p>
+              <p className="kicker">{nextUp.live ? "Live" : "Upcoming"}</p>
               <p className="text-base font-semibold">{nextUp.status}</p>
               <p className="stat-value">{remaining(nextUp.at, now)}</p>
               <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
@@ -279,43 +305,47 @@ export function TrackerDesk({ model }: { model: LinkModel }) {
               </p>
               {nextUp.provider ? <p className="text-base text-fg">{nextUp.provider}</p> : null}
               {nextUp.pad ? <p className="text-base text-fg">{nextUp.pad}</p> : null}
-              {nextUp.mission ? <p className="text-base text-fg">{nextUp.mission.slice(0, 180)}</p> : null}
+              {video ? (
+                <iframe
+                  className="mt-2 aspect-video w-full rounded-lg"
+                  src={`https://www.youtube.com/embed/${video}`}
+                  title={nextUp.name}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : nextUp.webcast ? (
+                <a className="btn btn-primary mt-2 w-full text-lg" href={nextUp.webcast} target="_blank" rel="noreferrer">
+                  Watch
+                </a>
+              ) : null}
             </article>
           ) : null}
-          {launches.some((row) => row.upcoming && row.id !== nextUp?.id) ? <p className="kicker">Also coming up</p> : null}
+          {coming.length > 1 ? <p className="kicker">Also coming up</p> : null}
           <ul className="grid gap-3">
-            {launches
-              .filter((row) => row.upcoming && row.id !== nextUp?.id)
-              .map((row) => (
-                <li key={row.id} className="pass-card">
-                  <p className="text-lg font-semibold">{remaining(row.at, now)}</p>
-                  <div className="min-w-0">
-                    <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
-                      {row.name}
-                    </p>
-                    <p className="text-base text-fg">{row.pad || row.rocket}</p>
-                  </div>
-                </li>
-              ))}
+            {coming.slice(1).map((row) => (
+              <li key={row.id} className="card grid gap-1">
+                <p className="text-lg font-semibold">{remaining(row.at, now)}</p>
+                <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
+                  {row.name}
+                </p>
+                <p className="text-base text-fg">{row.pad || row.rocket}</p>
+              </li>
+            ))}
           </ul>
           <p className="kicker">Previous</p>
           <ul className="grid gap-3">
-            {launches
-              .filter((row) => !row.upcoming)
-              .map((row) => (
-                <li key={row.id} className="pass-card">
-                  <p className="text-lg font-semibold">Done</p>
-                  <div className="min-w-0">
-                    <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
-                      {row.name}
-                    </p>
-                    <p className="text-base text-fg">
-                      {new Date(row.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                      {row.pad ? ` · ${row.pad}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
+            {previous.map((row) => (
+              <li key={row.id} className="card grid gap-1">
+                <p className="text-lg font-semibold">Done</p>
+                <p className="text-lg font-semibold" style={{ overflowWrap: "anywhere" }}>
+                  {row.name}
+                </p>
+                <p className="text-base text-fg">
+                  {new Date(row.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  {row.pad ? ` · ${row.pad}` : ""}
+                </p>
+              </li>
+            ))}
           </ul>
         </div>
       ) : (

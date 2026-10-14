@@ -125,6 +125,9 @@ export function Command() {
             Connect
           </button>
           {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
+          <a className="text-base font-semibold text-primary" href="/walkthrough.mp4">
+            3 minute walkthrough
+          </a>
         </section>
         <div role="tablist" aria-label="Desks" className="scroll-row">
           {TABS.map((item) => (

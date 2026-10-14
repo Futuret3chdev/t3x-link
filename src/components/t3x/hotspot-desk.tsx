@@ -32,12 +32,13 @@ function noteKind(kind: Hotspot["kind"]): FieldKind {
 
 function markers(center: Place | null, spots: Hotspot[]): MapDot[] {
   const dots: MapDot[] = spots.map((spot) => ({
+    id: spot.id,
     lon: spot.lon,
     lat: spot.lat,
-    tone: spot.free ? "gold" : "ivory",
-    label: `${spot.name} · ${formatDistance(spot.distanceM)}`,
+    tone: "gold",
+    label: spot.name.length > 22 ? `${spot.name.slice(0, 20)}…` : spot.name,
   }));
-  if (center) dots.push({ lon: center.lon, lat: center.lat, tone: "cobalt", label: center.label });
+  if (center) dots.push({ id: "here", lon: center.lon, lat: center.lat, tone: "cobalt", label: "You" });
   return dots;
 }
 
@@ -70,6 +71,7 @@ export function HotspotDesk({
   const [viewMode, setViewMode] = useState<"map" | "globe">("map");
   const [look, setLook] = useState<{ lat: number; lon: number; zoom: number } | null>(null);
   const [pin, setPin] = useState(0);
+  const [pickedId, setPickedId] = useState("");
 
   const visible = useMemo(() => {
     return spots
@@ -84,6 +86,7 @@ export function HotspotDesk({
 
   const dots = useMemo(() => markers(center, visible), [center, visible]);
   const nearestOpen = visible.find((spot) => spot.free && spot.ssid);
+  const picked = visible.find((spot) => spot.id === pickedId) || null;
 
   function showOnMap(spot: Hotspot) {
     setLook({ lat: spot.lat, lon: spot.lon, zoom: 16 });
@@ -105,6 +108,7 @@ export function HotspotDesk({
   async function scan(lat: number, lon: number, label: string, nextRadius = radius, widen = true) {
     setCenter({ lat, lon, label });
     setLook(null);
+    setPickedId("");
     setPin((value) => value + 1);
     setBusy("scan");
     setError("");
@@ -428,14 +432,38 @@ export function HotspotDesk({
               <p className="text-base text-fg">Gold is a major wifi city. Blue is a place from this scan. Drag to turn it.</p>
             </>
           ) : (
+            <>
             <SlippyMap
               lon={look?.lon ?? center?.lon ?? 144.9631}
               lat={look?.lat ?? center?.lat ?? -37.8136}
-              zoom={look?.zoom ?? (center ? (radius > 2500 ? 12 : 14) : 11)}
+              zoom={look?.zoom ?? (center ? (radius > 2500 ? 13 : 15) : 11)}
               tick={pin}
               dots={active ? dots : []}
+              selected={pickedId}
+              onPick={(id) => {
+                if (id === "here") return;
+                setPickedId(id);
+                const spot = spots.find((row) => row.id === id);
+                if (spot) showOnMap(spot);
+              }}
               className="h-72 w-full rounded-card border border-line sm:h-80 lg:h-[32rem]"
             />
+            {picked ? (
+              <div className="card grid gap-2">
+                <p className="text-lg font-semibold">{picked.name}</p>
+                <p className="text-base text-fg">
+                  {picked.kindLabel}
+                  {picked.ssid ? ` · ${picked.ssid}` : ""} · {formatDistance(picked.distanceM)}
+                </p>
+                {picked.ssid ? (
+                  <button type="button" className="btn btn-primary w-full text-lg" onClick={() => void connect(picked)}>
+                    <Wifi aria-hidden="true" size={16} />
+                    Connect
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            </>
           )}
         </div>
       </div>

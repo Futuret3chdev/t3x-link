@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type MapDot = {
+  id?: string;
   lon: number;
   lat: number;
   tone: "gold" | "cobalt" | "ivory" | "mark";
   label: string;
 };
 
-const TONE_VAR: Record<MapDot["tone"], string> = {
-  gold: "--color-accent",
-  cobalt: "--color-primary",
-  ivory: "--color-fg",
-  mark: "--color-mark",
+const TONE_COLOR: Record<MapDot["tone"], string> = {
+  gold: "#d4b15a",
+  cobalt: "#2f7bff",
+  ivory: "#f4efe6",
+  mark: "#d4544a",
 };
 
 function world(lon: number, lat: number, zoom: number) {
@@ -37,6 +38,8 @@ export function SlippyMap({
   zoom,
   tick = 0,
   dots,
+  selected = "",
+  onPick,
   className,
 }: {
   lon: number;
@@ -44,6 +47,8 @@ export function SlippyMap({
   zoom: number;
   tick?: number;
   dots: MapDot[];
+  selected?: string;
+  onPick?: (id: string) => void;
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -105,24 +110,31 @@ export function SlippyMap({
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, size.w, size.h);
     const origin = world(view.lon, view.lat, view.zoom);
-    const styles = getComputedStyle(document.documentElement);
-    for (const dot of dots) {
+    const ordered = [...dots].sort((a, b) => Number(a.id === selected) - Number(b.id === selected));
+    for (const dot of ordered) {
       const point = world(dot.lon, dot.lat, view.zoom);
       const x = size.w / 2 + (point.x - origin.x);
       const y = size.h / 2 + (point.y - origin.y);
-      if (x < -6 || y < -6 || x > size.w + 6 || y > size.h + 6) continue;
-      const fill = styles.getPropertyValue(TONE_VAR[dot.tone]).trim() || "#f4efe6";
+      if (x < -20 || y < -20 || x > size.w + 20 || y > size.h + 20) continue;
+      const chosen = Boolean(dot.id && dot.id === selected);
+      const radius = dot.tone === "cobalt" ? 7 : chosen ? 11 : 8;
       ctx.beginPath();
-      ctx.fillStyle = fill;
-      ctx.arc(x, y, dot.tone === "ivory" ? 2.4 : 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = TONE_COLOR[dot.tone];
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
-      if (dot.tone !== "ivory") {
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = styles.getPropertyValue("--color-bg").trim() || "#07080d";
-        ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#07080d";
+      ctx.stroke();
+      if (dot.tone !== "cobalt") {
+        ctx.font = "700 14px sans-serif";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#07080d";
+        ctx.strokeText(dot.label, x + 12, y - 8);
+        ctx.fillStyle = "#f4efe6";
+        ctx.fillText(dot.label, x + 12, y - 8);
       }
     }
-  }, [dots, size.h, size.w, view.lat, view.lon, view.zoom]);
+  }, [dots, selected, size.h, size.w, view.lat, view.lon, view.zoom]);
 
   function zoomBy(delta: number) {
     setView((current) => ({ ...current, zoom: Math.max(2, Math.min(16, current.zoom + delta)) }));
@@ -134,7 +146,7 @@ export function SlippyMap({
     const rect = node.getBoundingClientRect();
     const origin = world(view.lon, view.lat, view.zoom);
     let best = "";
-    let bestD = 22;
+    let bestD = 36;
     for (const dot of dots) {
       const point = world(dot.lon, dot.lat, view.zoom);
       const x = size.w / 2 + (point.x - origin.x);
@@ -142,7 +154,7 @@ export function SlippyMap({
       const distance = Math.hypot(clientX - rect.left - x, clientY - rect.top - y);
       if (distance < bestD) {
         bestD = distance;
-        best = dot.label;
+        best = dot.id || dot.label;
       }
     }
     return best;
@@ -198,7 +210,11 @@ export function SlippyMap({
     const start = gesture.current;
     const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
     pointers.current.delete(event.pointerId);
-    if (moved < 8) setTip(nearest(event.clientX, event.clientY));
+    if (moved < 8) {
+      const hit = nearest(event.clientX, event.clientY);
+      setTip(hit);
+      if (hit) onPick?.(hit);
+    }
   }
 
   return (

@@ -34,7 +34,10 @@ function OpenFilm({ onDone }: { onDone: () => void }) {
   function withSound() {
     const node = video.current;
     if (!node) return;
+    node.pause();
+    node.currentTime = 0;
     node.muted = false;
+    node.volume = 1;
     setSound(true);
     void node.play().catch(() => undefined);
   }
@@ -47,7 +50,7 @@ function OpenFilm({ onDone }: { onDone: () => void }) {
         src="/promo.mp4"
         playsInline
         autoPlay
-        muted
+        muted={!sound}
         onEnded={onDone}
       />
       <button type="button" className="btn btn-primary intro-skip" onClick={onDone}>
@@ -55,7 +58,7 @@ function OpenFilm({ onDone }: { onDone: () => void }) {
       </button>
       {sound ? null : (
         <button type="button" className="btn btn-accent intro-sound" onClick={withSound}>
-          Sound
+          Sound on
         </button>
       )}
     </div>

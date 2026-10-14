@@ -73,6 +73,7 @@ export function HotspotDesk({
   const [pin, setPin] = useState(0);
   const [pickedId, setPickedId] = useState("");
   const [spotPage, setSpotPage] = useState(0);
+  const [joinName, setJoinName] = useState("");
 
   const visible = useMemo(() => {
     return spots
@@ -106,7 +107,7 @@ export function HotspotDesk({
     setJoinNote("");
     setError("");
     try {
-      setJoinNote(await joinOpenWifi(spot.ssid));
+      setJoinNote(await joinOpenWifi(spot.ssid || joinName));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start the join.");
     }
@@ -463,6 +464,7 @@ export function HotspotDesk({
                 if (id === "here") return;
                 setPickedId(id);
                 const spot = spots.find((row) => row.id === id);
+                setJoinName(spot?.ssid || "");
                 if (spot) showOnMap(spot);
               }}
               className="h-72 w-full rounded-card border border-line sm:h-80 lg:h-[32rem]"
@@ -474,12 +476,25 @@ export function HotspotDesk({
                   {picked.kindLabel}
                   {picked.ssid ? ` · ${picked.ssid}` : ""} · {formatDistance(picked.distanceM)}
                 </p>
-                {picked.ssid ? (
-                  <button type="button" className="btn btn-primary w-full text-lg" onClick={() => void connect(picked)}>
-                    <Wifi aria-hidden="true" size={16} />
-                    Connect
-                  </button>
-                ) : null}
+                {picked.ssid ? null : (
+                  <input
+                    className="field"
+                    value={joinName}
+                    onChange={(event) => setJoinName(event.target.value)}
+                    placeholder="Network name"
+                    autoComplete="off"
+                  />
+                )}
+                <button
+                  type="button"
+                  className="btn btn-primary w-full text-lg"
+                  disabled={!(picked.ssid || joinName).trim()}
+                  onClick={() => void connect(picked)}
+                >
+                  <Wifi aria-hidden="true" size={16} />
+                  Connect
+                </button>
+                {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}
               </div>
             ) : null}
             </>

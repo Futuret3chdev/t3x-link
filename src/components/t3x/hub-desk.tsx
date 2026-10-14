@@ -97,12 +97,18 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const ping = model.path?.pingMs ?? null;
   const alerts = useMemo(() => {
     const rows: string[] = [];
+    const latest = pings.at(-1)?.pingMs ?? ping;
     if (link && !link.online) rows.push("The link is down.");
-    if (ping != null && ping >= 250) rows.push("Latency is high on this path.");
+    if (latest != null && latest >= 150) rows.push("Latency is high on this path.");
+    if (liveLoaded != null && latest != null && liveLoaded >= latest * 2 && liveLoaded >= 120) {
+      rows.push("Loaded ping is much higher than the idle ping.");
+    }
+    if (liveDown != null && liveDown < 2) rows.push("Download is very slow.");
+    if (liveUp != null && liveUp < 0.5) rows.push("Upload is very slow.");
     if (link?.saveData) rows.push("The phone is saving data.");
-    if (model.identity?.starlink && ping != null && ping >= 80) rows.push("Starlink is up, but this pass is slower than a clear shot.");
+    if (model.identity?.starlink && latest != null && latest >= 80) rows.push("Starlink is up, but this pass is slower than a clear shot.");
     return rows;
-  }, [link, model.identity?.starlink, ping]);
+  }, [link, liveDown, liveLoaded, liveUp, model.identity?.starlink, ping, pings]);
 
   async function ask(event: React.FormEvent) {
     event.preventDefault();

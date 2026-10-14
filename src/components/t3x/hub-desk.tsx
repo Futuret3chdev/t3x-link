@@ -21,6 +21,10 @@ export function HubDesk({ model }: { model: LinkModel }) {
   const [report, setReport] = useState<ToolReport | null>(null);
   const [toolError, setToolError] = useState("");
   const [toolBusy, setToolBusy] = useState(false);
+  const [liveDown, setLiveDown] = useState<number | null>(null);
+  const [liveUp, setLiveUp] = useState<number | null>(null);
+  const [downTrail, setDownTrail] = useState<number[]>([]);
+  const [upTrail, setUpTrail] = useState<number[]>([]);
 
   useEffect(() => {
     const sync = () => {
@@ -30,6 +34,53 @@ export function HubDesk({ model }: { model: LinkModel }) {
     };
     sync();
     return subscribeMemory(sync);
+  }, []);
+
+  useEffect(() => {
+    let stop = false;
+    let timer = 0;
+    let which: "down" | "up" = "down";
+    const beat = async () => {
+      if (stop) return;
+      try {
+        if (which === "down") {
+          const start = performance.now();
+          const res = await fetch(`https://speed.cloudflare.com/__down?bytes=400000&r=${Math.random()}`, { cache: "no-store" });
+          const body = await res.arrayBuffer();
+          const seconds = (performance.now() - start) / 1000;
+          const mbps = seconds > 0 ? (body.byteLength * 8) / seconds / 1_000_000 : 0;
+          if (!stop && res.ok && mbps > 0) {
+            setLiveDown(mbps);
+            setDownTrail((rows) => [...rows, mbps].slice(-12));
+          }
+          which = "up";
+        } else {
+          const bytes = 120_000;
+          const start = performance.now();
+          const res = await fetch("https://speed.cloudflare.com/__up", {
+            method: "POST",
+            body: new Uint8Array(bytes),
+            cache: "no-store",
+          });
+          await res.arrayBuffer();
+          const seconds = (performance.now() - start) / 1000;
+          const mbps = seconds > 0 ? (bytes * 8) / seconds / 1_000_000 : 0;
+          if (!stop && res.ok && mbps > 0) {
+            setLiveUp(mbps);
+            setUpTrail((rows) => [...rows, mbps].slice(-12));
+          }
+          which = "down";
+        }
+      } catch {
+        which = which === "down" ? "up" : "down";
+      }
+      if (!stop) timer = window.setTimeout(() => void beat(), 2000);
+    };
+    timer = window.setTimeout(() => void beat(), 600);
+    return () => {
+      stop = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   const link = model.link;
@@ -58,6 +109,11 @@ export function HubDesk({ model }: { model: LinkModel }) {
   }
 
   const peak = Math.max(1, ...pings.map((row) => row.pingMs));
+  const downPeak = Math.max(1, ...downTrail);
+  const upPeak = Math.max(1, ...upTrail);
+  const downShown = liveDown ?? bench?.downMbps ?? null;
+  const upShown = liveUp ?? bench?.upMbps ?? null;
+  const rate = (value: number | null) => (value == null ? "—" : value >= 10 ? value.toFixed(1) : value.toFixed(2));
 
   return (
     <div className="grid gap-4">
@@ -114,21 +170,35 @@ export function HubDesk({ model }: { model: LinkModel }) {
         </div>
       ) : null}
 
-      {bench ? (
+      {downShown != null || upShown != null ? (
         <section className="grid grid-cols-3 gap-3">
           <article className="card">
             <p className="stat-label">Down</p>
-            <p className="stat-value mt-2">{bench.downMbps == null ? "—" : bench.downMbps >= 10 ? bench.downMbps.toFixed(1) : bench.downMbps.toFixed(2)}</p>
+            <p className="stat-value mt-2">{rate(downShown)}</p>
             <p className="text-base text-fg">Mb/s</p>
+            {downTrail.length > 1 ? (
+              <div className="mt-2 flex h-8 items-end gap-0.5" aria-hidden="true">
+                {downTrail.map((value, index) => (
+                  <div key={`${index}-${value}`} className="trail-bar min-w-1 flex-1 rounded-sm bg-accent" style={{ height: `${Math.max(12, Math.round((value / downPeak) * 100))}%` }} />
+                ))}
+              </div>
+            ) : null}
           </article>
           <article className="card">
             <p className="stat-label">Up</p>
-            <p className="stat-value mt-2">{bench.upMbps == null ? "—" : bench.upMbps >= 10 ? bench.upMbps.toFixed(1) : bench.upMbps.toFixed(2)}</p>
+            <p className="stat-value mt-2">{rate(upShown)}</p>
             <p className="text-base text-fg">Mb/s</p>
+            {upTrail.length > 1 ? (
+              <div className="mt-2 flex h-8 items-end gap-0.5" aria-hidden="true">
+                {upTrail.map((value, index) => (
+                  <div key={`${index}-${value}`} className="trail-bar min-w-1 flex-1 rounded-sm bg-primary" style={{ height: `${Math.max(12, Math.round((value / upPeak) * 100))}%` }} />
+                ))}
+              </div>
+            ) : null}
           </article>
           <article className="card">
             <p className="stat-label">Loaded</p>
-            <p className="mt-2 text-lg font-semibold">{formatMs(bench.loadedPingMs ?? null)}</p>
+            <p className="stat-value mt-2">{formatMs(bench?.loadedPingMs ?? null)}</p>
           </article>
         </section>
       ) : null}

@@ -4,7 +4,7 @@ import { SlippyMap, type MapDot } from "@/components/t3x/slippy-map";
 import { FleetGlobe } from "@/components/t3x/fleet-globe";
 import { formatDistance, wifiUri } from "@/lib/net/format";
 import { saveNote } from "@/lib/net/memory";
-import { pickBluetooth } from "@/lib/net/phone";
+import { pickBluetooth, scanNearbyRadios } from "@/lib/net/phone";
 import { geocodePlace, searchHotspots } from "@/lib/net/places";
 import type { FieldKind, Hotspot } from "@/lib/net/types";
 import { joinOpenWifi } from "@/lib/net/wifi-join";
@@ -66,6 +66,7 @@ export function HotspotDesk({
   const [bleName, setBleName] = useState("");
   const [joinNote, setJoinNote] = useState("");
   const [joinQr, setJoinQr] = useState("");
+  const [nearby, setNearby] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [shared, setShared] = useState("");
@@ -106,24 +107,41 @@ export function HotspotDesk({
 
   async function connect(spot: Hotspot) {
     setJoinNote("");
-    setJoinQr("");
     setError("");
-    const name = (spot.ssid || joinName).trim();
     try {
-      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-        const mod = await import("qrcode");
-        const url = await mod.toDataURL(wifiUri({ ssid: name, password: "", security: "nopass", hidden: false }), {
-          margin: 1,
-          width: 320,
-          color: { dark: "#07080d", light: "#f4efe6" },
-        });
-        setJoinQr(url);
-        setJoinNote("Point the Camera at this code and tap Join.");
-        return;
-      }
-      setJoinNote(await joinOpenWifi(name));
+      setJoinNote(await joinOpenWifi(spot.ssid || joinName));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start the join.");
+    }
+  }
+
+  async function showCode(name: string) {
+    setJoinNote("");
+    setError("");
+    try {
+      const mod = await import("qrcode");
+      const url = await mod.toDataURL(wifiUri({ ssid: name.trim(), password: "", security: "nopass", hidden: false }), {
+        margin: 1,
+        width: 320,
+        color: { dark: "#07080d", light: "#f4efe6" },
+      });
+      setJoinQr(url);
+      setJoinNote("This code is for another phone. Point that camera at it and tap Join.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not draw the code.");
+    }
+  }
+
+  async function scanRadios() {
+    setError("");
+    setNearby([]);
+    try {
+      const note = await scanNearbyRadios((name) => {
+        setNearby((rows) => (rows.includes(name) ? rows : [...rows, name].slice(0, 12)));
+      });
+      setStatus(note);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The nearby scan stopped.");
     }
   }
 
@@ -276,8 +294,21 @@ export function HotspotDesk({
         </p>
         <button type="button" className="btn btn-primary mt-4 w-full text-lg" onClick={() => locate(1500)} disabled={busy !== null}>
           <LocateFixed aria-hidden="true" size={18} />
-          {busy === "locate" || busy === "scan" ? "Scanning…" : "Scan"}
+          {busy === "locate" || busy === "scan" ? "Scanning…" : "Scan places"}
         </button>
+        <button type="button" className="btn btn-ghost mt-2 w-full" onClick={() => void scanRadios()} disabled={busy !== null}>
+          <Bluetooth aria-hidden="true" size={16} />
+          Scan nearby
+        </button>
+        {nearby.length > 0 ? (
+          <ul className="mt-2 grid gap-1">
+            {nearby.map((name) => (
+              <li key={name} className="text-base text-fg">
+                {name}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {accuracy != null ? <p className="mt-2 text-base text-fg">Location locked to about {accuracy} m.</p> : null}
         {status ? <p className="mt-1 text-base font-semibold text-fg">{status}</p> : null}
         <form onSubmit={(event) => void searchPlace(event)} className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -506,7 +537,15 @@ export function HotspotDesk({
                   onClick={() => void connect(picked)}
                 >
                   <Wifi aria-hidden="true" size={16} />
-                  Connect
+                  Join this phone
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost w-full"
+                  disabled={!(picked.ssid || joinName).trim()}
+                  onClick={() => void showCode(picked.ssid || joinName)}
+                >
+                  Code for another phone
                 </button>
                 {joinQr ? <img src={joinQr} alt="Join code for the camera" className="mx-auto w-44 rounded-lg" /> : null}
                 {joinNote ? <p className="text-base text-fg">{joinNote}</p> : null}

@@ -7,7 +7,8 @@ export async function joinOpenWifi(ssid: string): Promise<string> {
   const android = /Android/i.test(navigator.userAgent);
   const target = `/api/wifi?ssid=${encodeURIComponent(name)}`;
   if (ios) {
-    return "Point the Camera at the join code and tap Join.";
+    window.location.assign(target);
+    return "Tap Install on the warning. This phone then joins that open network.";
   }
   try {
     await navigator.clipboard.writeText(name);

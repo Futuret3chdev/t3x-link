@@ -80,6 +80,29 @@ export async function samplePath(signal: AbortSignal): Promise<PathSample> {
   return { pingMs, downMbps };
 }
 
+export async function scanNearbyRadios(onFound: (name: string) => void): Promise<string> {
+  const nav = navigator as Navigator & {
+    bluetooth?: {
+      requestLEScan?: (options: { acceptAllAdvertisements: boolean }) => Promise<void>;
+      requestDevice: (options: { acceptAllDevices: boolean }) => Promise<{ name?: string }>;
+      addEventListener: (type: string, listener: (event: { name?: string; device?: { name?: string } }) => void) => void;
+    };
+  };
+  if (!nav.bluetooth) return "This phone does not let a website scan Wi-Fi names.";
+  if (nav.bluetooth.requestLEScan) {
+    await nav.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
+    nav.bluetooth.addEventListener("advertisementreceived", (event) => {
+      const name = event.name || event.device?.name || "";
+      if (name.trim()) onFound(name.trim());
+    });
+    return "Scanning nearby Bluetooth. Wi-Fi names stay on the phone.";
+  }
+  const device = await nav.bluetooth.requestDevice({ acceptAllDevices: true });
+  const name = device.name?.trim() || "Unnamed device";
+  onFound(name);
+  return name;
+}
+
 export async function pickBluetooth(): Promise<string> {
   const nav = navigator as Navigator & {
     bluetooth?: {

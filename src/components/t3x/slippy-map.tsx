@@ -125,7 +125,7 @@ export function SlippyMap({
       ctx.lineWidth = 2;
       ctx.strokeStyle = "#07080d";
       ctx.stroke();
-      if (dot.tone !== "cobalt") {
+      if (dot.tone !== "cobalt" && dot.id && dot.id === selected) {
         ctx.font = "700 14px sans-serif";
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#07080d";
@@ -140,12 +140,12 @@ export function SlippyMap({
     setView((current) => ({ ...current, zoom: Math.max(2, Math.min(16, current.zoom + delta)) }));
   }
 
-  function nearest(clientX: number, clientY: number) {
+  function nearest(clientX: number, clientY: number): { id: string; label: string } | null {
     const node = box.current;
-    if (!node) return "";
+    if (!node) return null;
     const rect = node.getBoundingClientRect();
     const origin = world(view.lon, view.lat, view.zoom);
-    let best = "";
+    let best: { id: string; label: string } | null = null;
     let bestD = 36;
     for (const dot of dots) {
       const point = world(dot.lon, dot.lat, view.zoom);
@@ -154,7 +154,7 @@ export function SlippyMap({
       const distance = Math.hypot(clientX - rect.left - x, clientY - rect.top - y);
       if (distance < bestD) {
         bestD = distance;
-        best = dot.id || dot.label;
+        best = { id: dot.id || "", label: dot.label };
       }
     }
     return best;
@@ -212,8 +212,8 @@ export function SlippyMap({
     pointers.current.delete(event.pointerId);
     if (moved < 8) {
       const hit = nearest(event.clientX, event.clientY);
-      setTip(hit);
-      if (hit) onPick?.(hit);
+      setTip(hit?.label || "");
+      if (hit?.id) onPick?.(hit.id);
     }
   }
 

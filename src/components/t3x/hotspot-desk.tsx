@@ -464,7 +464,7 @@ export function HotspotDesk({
                 if (id === "here") return;
                 setPickedId(id);
                 const spot = spots.find((row) => row.id === id);
-                setJoinName(spot?.ssid || "");
+                setJoinName(spot?.ssid || spot?.name || "");
                 if (spot) showOnMap(spot);
               }}
               className="h-72 w-full rounded-card border border-line sm:h-80 lg:h-[32rem]"
